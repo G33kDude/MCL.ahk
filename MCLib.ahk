@@ -7,9 +7,8 @@ MCLib_FromC(code)
 	FileDelete, test.*
 	
 	fmt := A_PtrSize == 4 ? "pe-i386" : "pe-x86-64"
-	FileOpen("linker", "w").Write("OUTPUT_FORMAT(" fmt ")SECTIONS{.text :{*(.text*)*(.rodata*)*(.rdata*)}}")
-	
-	FileOpen("test.c", "w").Write(code)
+	FileOpen("linker", "w").Write("OUTPUT_FORMAT(" fmt ")SECTIONS{.text :{*(.ahk_entry)*(.text*)*(.rodata*)*(.rdata*)}}")
+	FileOpen("test.c", "w").Write("#define ahk_entry __attribute__((section("".ahk_entry"")))`n" code)
 	
 	shell := ComObjCreate("WScript.Shell")
 	exec := shell.Exec("gcc.exe -m" A_PtrSize*8 " -g0 -O3 -c test.c")
@@ -55,7 +54,7 @@ MCLib_AhkFromC(code)
 	FileDelete, test.*
 	
 	; Write the code to a file
-	FileOpen("test.c", "w").Write(code)
+	FileOpen("test.c", "w").Write("#define ahk_entry __attribute__((section("".ahk_entry"")))`n" code)
 	
 	; Execute GCC to compile the c to an unlinked object file
 	shell := ComObjCreate("WScript.Shell")
@@ -67,7 +66,7 @@ MCLib_AhkFromC(code)
 	
 	; Write the appropriate linker script
 	fmt := A_PtrSize == 4 ? "pe-i386" : "pe-x86-64"
-	FileOpen("linker", "w").Write("OUTPUT_FORMAT(" fmt ")SECTIONS{.text :{*(.text*)*(.rodata*)*(.rdata*)}}")
+	FileOpen("linker", "w").Write("OUTPUT_FORMAT(" fmt ")SECTIONS{.text :{*(.ahk_entry)*(.text*)*(.rodata*)*(.rdata*)}}")
 	
 	; Run the linker using the linker script
 	m := A_PtrSize == 4 ? "-m i386pe" : ""
