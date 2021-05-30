@@ -1,5 +1,4 @@
-﻿#Include %A_ScriptDir%
-#Include SymbolReader.ahk
+﻿#Include SymbolReader.ahk
 
 SetWorkingDir, %A_ScriptDir%
 
@@ -9,12 +8,23 @@ class MClib {
 		
 		FileOpen("test.c", "w").Write(code)
 		
+		while (!FileExist("test.c")) {
+			Sleep, 100
+		}
+		
 		shell := ComObjCreate("WScript.Shell")
 		exec := shell.Exec("x86_64-w64-mingw32-" Compiler ".exe -m64" ExtraOptions " -ffreestanding -nostdlib -T linker_script test.c")
 		exec.StdIn.Close()
 		
 		if !exec.StdErr.AtEndOfStream
 			Throw Exception(exec.StdErr.ReadAll(),, "Compiler Error")
+		
+		while (!FileExist("a.exe")) {
+			Sleep, 100
+		}
+		
+		FileDelete, test.c
+		FileDelete, linker_script
 		
 		if !(F := FileOpen("a.exe", "r"))
 			Throw Exception("Failed to load output file")
@@ -25,6 +35,9 @@ class MClib {
 			Throw Exception("Failed to reserve MCLib PE memory")
 		
 		F.RawRead(pPE + 0, Size)
+		F.Close()
+		
+		FileDelete, a.exe
 		
 		Reader := new PESymbolReader(pPE, Size)
 		Output := Reader.Read()
@@ -64,7 +77,7 @@ class MClib {
 	}
 	
 	FromCPP(Code) {
-		return this.Fixup(this.Generic("g++", Code, " -fno-exceptions -fno-rtti")*)
+		return this.Fixup(this.Generic("g++", "extern ""C"" {`n" Code "`n}", " -fno-exceptions -fno-rtti")*)
 	}
 	
 	Pack(pCode, Output) {
@@ -109,6 +122,6 @@ class MClib {
 	}
 	
 	AHKFromCPP(Code) {
-		return this.Pack(this.Generic("g++", Code, " -fno-exceptions -fno-rtti")*)
+		return this.Pack(this.Generic("g++", "extern ""C"" {`n" Code "`n}", " -fno-exceptions -fno-rtti")*)
 	}
 }
