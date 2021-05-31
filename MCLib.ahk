@@ -44,6 +44,18 @@ class MClib {
 		}
 	}
 
+	GetTempPath(baseDir := "", prefix := "", ext := ".tmp") {
+		if (baseDir == "" || !InStr(FileExist(baseDir), "D"))
+			baseDir := A_Temp
+		Loop
+		{
+			DllCall("QueryPerformanceCounter", "Int64*", counter)
+			fileName := baseDir "\" prefix . counter . ext
+		}
+		until !FileExist(fileName)
+		return prefix counter ext
+	}
+
 	NormalizeSymbols(Symbols) {
 		KeepSymbolNames := {"__main": 1, "hProcessHeap": 1, "HeapAlloc": 1, "HeapFree": 1}
 
@@ -59,32 +71,42 @@ class MClib {
 	}
 
 	Compile(Compiler, Code, ExtraOptions := "") {
-		OldWorkingDir := A_WorkingDir
-		SetWorkingDir, %A_LineFile%/../
+		LinkerScript := MClib.GetTempPath(A_WorkingDir, "mclib-linker-", "")
+		InputFile    := MClib.GetTempPath(A_WorkingDir, "mclib-input-", ".c")
+		OutputFile   := MClib.GetTempPath(A_WorkingDir, "mclib-output-", ".bin")
 
-		FileOpen("linker_script", "w").Write("OUTPUT_FORMAT(pe-x86-64)SECTIONS{.text :{*(.text*)*(.rodata*)*(.rdata*)*(.data*)*(.bss*)}}")
+		if (!FileExist("ahk.h")) {
+			FileCopy, %A_LineFile%/../ahk.h, ahk.h
+			ShouldDeleteHeader := true
+		}
+
+		FileOpen(LinkerScript, "w").Write("OUTPUT_FORMAT(pe-x86-64)SECTIONS{.text :{*(.text*)*(.rodata*)*(.rdata*)*(.data*)*(.bss*)}}")
+
+		FileOpen(InputFile, "w").Write(code)
 		
-		FileOpen("test.c", "w").Write(code)
-		
-		while (!FileExist("test.c")) {
+		while (!FileExist(InputFile)) {
 			Sleep, 100
 		}
 		
 		shell := ComObjCreate("WScript.Shell")
-		exec := shell.Exec("x86_64-w64-mingw32-" Compiler ".exe -m64" ExtraOptions " -ffreestanding -nostdlib -Wno-attribute-alias -T linker_script test.c")
+		exec := shell.Exec("x86_64-w64-mingw32-" Compiler ".exe -m64" ExtraOptions " -ffreestanding -nostdlib -Wno-attribute-alias -T " LinkerScript " " InputFile " -o " OutputFile)
 		exec.StdIn.Close()
 		
 		if !exec.StdErr.AtEndOfStream
 			Throw Exception(exec.StdErr.ReadAll(),, "Compiler Error")
 		
-		while (!FileExist("a.exe")) {
+		while (!FileExist(OutputFile)) {
 			Sleep, 100
 		}
 		
-		FileDelete, test.c
-		FileDelete, linker_script
+		FileDelete, % InputFile
+		FileDelete, % LinkerScript
+
+		if (ShouldDeleteHeader) {
+			FileDelete, ahk.h
+		}
 		
-		if !(F := FileOpen("a.exe", "r"))
+		if !(F := FileOpen(OutputFile, "r"))
 			Throw Exception("Failed to load output file")
 		
 		Size := F.Length
@@ -95,14 +117,12 @@ class MClib {
 		F.RawRead(pPE + 0, Size)
 		F.Close()
 		
-		;FileDelete, a.exe
+		FileDelete, % OutputFile
 		
 		Reader := new PESymbolReader(pPE, Size)
 		Output := Reader.Read()
 		
 		pCode := pPE + Output.SectionsByName[".text"].FileOffset
-
-		SetWorkingDir, % OldWorkingDir
 
 		return [pCode, Output.SectionsByName[".text"].FileSize, this.NormalizeSymbols(Output.AbsoluteSymbols)]
 	}
