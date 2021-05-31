@@ -3,8 +3,9 @@ MCLib_FromC(code)
 {
 	;EnvSet, PATH, C:\Program Files\mingw-w64\x86_64-8.1.0-win32-seh-rt_v6-rev0\mingw64\bin
 	EnvSet, PATH, C:\TDM-GCC-64\bin
-	SetWorkingDir, %A_Desktop%\MCLib
-	FileDelete, test.*
+	dirPath := MCLib_TempFile(,"~MCLib~")
+	FileCreateDir, % dirPath
+	SetWorkingDir, % dirPath
 	
 	fmt := A_PtrSize == 4 ? "pe-i386" : "pe-x86-64"
 	FileOpen("linker", "w").Write("OUTPUT_FORMAT(" fmt ")SECTIONS{.text :{*(.ahk_entry)*(.text*)*(.rodata*)*(.rdata*)}}")
@@ -44,14 +45,16 @@ MCLib_FromC(code)
 	
 	f.RawRead(pBinary+0, cbBinary)
 	
+	FileRemoveDir, % dirPath, 1
 	return pBinary
 }
 
 MCLib_AhkFromC(code)
 {
 	EnvSet, PATH, C:\TDM-GCC-64\bin
-	SetWorkingDir, %A_Desktop%\MCLib
-	FileDelete, test.*
+	dirPath := MCLib_TempFile(,"~MCLib~")
+	FileCreateDir, % dirPath
+	SetWorkingDir, % dirPath
 	
 	; Write the code to a file
 	FileOpen("test.c", "w").Write("#define ahk_entry __attribute__((section("".ahk_entry"")))`n" code)
@@ -116,6 +119,7 @@ MCLib_AhkFromC(code)
 		out .= "`n. """ SubStr(str, 1, 120-8) """", str := SubStr(str, (120-8)+1)
 	; out .= ")"
 
+	FileRemoveDir, % dirPath, 1
 	return out "`n" cbBuf
 }
 
@@ -140,4 +144,17 @@ MCLib(cbBinary, ByRef b64)
 		, cbFinal, "UInt"))
 		throw Exception("Error decompressing MCLib",, Format("0x{:08x}", r))
 	return pBinary
+}
+
+MCLib_TempFile(baseDir := "", prefix := "", ext := ".tmp")
+{
+	if (baseDir == "" || !InStr(FileExist(baseDir), "D"))
+		baseDir := A_Temp
+	Loop
+	{
+		DllCall("QueryPerformanceCounter", "Int64*", counter)
+		fileName := baseDir "\" prefix . counter . ext
+	}
+	until !FileExist(fileName)
+	return fileName
 }
