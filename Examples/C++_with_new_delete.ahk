@@ -4,21 +4,7 @@
 CPP = 
 ( %
 
-#include <stdint.h>
-
-typedef uint64_t size_t;
-
-void* (*HeapAlloc)(uint64_t, uint32_t, size_t);
-void (*HeapFree)(uint64_t, uint32_t, void*);
-
-uint64_t hProcessHeap;
-
-void* operator new(size_t size) {
-	return HeapAlloc(hProcessHeap, 0x8, size);
-}
-void operator delete(void* Memory) {
-	HeapFree(hProcessHeap, 0, Memory);
-}
+#include "ahk.h"
 
 class Point {
 public:

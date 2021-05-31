@@ -4,22 +4,7 @@
 C =
 ( %
 
-#include <stdint.h>
-
-typedef uint64_t size_t;
-
-void* (*HeapAlloc)(uint64_t, uint32_t, size_t);
-void (*HeapFree)(uint64_t, uint32_t, void*);
-
-uint64_t hProcessHeap;
-
-void* malloc(size_t Size) {
-	return HeapAlloc(hProcessHeap, 0x8, Size);
-}
-void free(void* Memory) {
-	HeapFree(hProcessHeap, 0, Memory);
-}
-
+#include "ahk.h"
 
 typedef struct {
 	int X;

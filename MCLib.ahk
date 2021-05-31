@@ -1,9 +1,10 @@
 ﻿#Include SymbolReader.ahk
 
-SetWorkingDir, %A_ScriptDir%
-
 class MClib {
 	Generic(Compiler, Code, ExtraOptions := "") {
+		OldWorkingDir := A_WorkingDir
+		SetWorkingDir, %A_LineFile%/../
+
 		FileOpen("linker_script", "w").Write("OUTPUT_FORMAT(pe-x86-64)SECTIONS{.text :{*(.text*)*(.rodata*)*(.rdata*)*(.data*)*(.bss*)}}")
 		
 		FileOpen("test.c", "w").Write(code)
@@ -13,7 +14,7 @@ class MClib {
 		}
 		
 		shell := ComObjCreate("WScript.Shell")
-		exec := shell.Exec("x86_64-w64-mingw32-" Compiler ".exe -m64" ExtraOptions " -ffreestanding -nostdlib -T linker_script test.c")
+		exec := shell.Exec("x86_64-w64-mingw32-" Compiler ".exe -m64" ExtraOptions " -ffreestanding -nostdlib -Wno-attribute-alias -T linker_script test.c")
 		exec.StdIn.Close()
 		
 		if !exec.StdErr.AtEndOfStream
@@ -37,12 +38,14 @@ class MClib {
 		F.RawRead(pPE + 0, Size)
 		F.Close()
 		
-		FileDelete, a.exe
+		;FileDelete, a.exe
 		
 		Reader := new PESymbolReader(pPE, Size)
 		Output := Reader.Read()
 		
 		pCode := pPE + Output.SectionsByName[".text"].FileOffset
+
+		SetWorkingDir, % OldWorkingDir
 
 		return [pCode, Output]
 	}
@@ -69,7 +72,20 @@ class MClib {
 		if !DllCall("VirtualProtect", "Ptr", pCode, "Ptr", TextSize, "UInt", 0x40, "UInt*", OldProtect, "UInt")
 			Throw Exception("Failed to mark MCLib memory as executable")
 		
-		return pCode + OffsetOfMain
+		Exports := {}
+
+		for SymbolName, Symbol in Output.AbsoluteSymbols {
+			if (RegExMatch(SymbolName, "O)__mcode_e_(\w+)", Match)) {
+				Exports[Match[1]] := pCode + Symbol.Value
+			}
+		}
+
+		if (Exports.Count()) {
+			return Exports
+		}
+		else {
+			return pCode + OffsetOfMain
+		}
 	}
 	
 	FromC(Code) {
@@ -123,5 +139,10 @@ class MClib {
 	
 	AHKFromCPP(Code) {
 		return this.Pack(this.Generic("g++", "extern ""C"" {`n" Code "`n}", " -fno-exceptions -fno-rtti")*)
+	}
+
+	FromString(Code) {
+
+
 	}
 }
