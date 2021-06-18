@@ -1,4 +1,4 @@
-﻿#Include SymbolReader.ahk
+#Include SymbolReader.ahk
 
 class MClib {
 	class LZ {
