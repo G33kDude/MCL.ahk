@@ -57,12 +57,10 @@ class MClib {
 	}
 
 	NormalizeSymbols(Symbols) {
-		KeepSymbolNames := {"__main": 1, "hProcessHeap": 1, "HeapAlloc": 1, "HeapFree": 1}
-
 		Result := {}
 
 		for SymbolName, Symbol in Symbols {
-			if (KeepSymbolNames[SymbolName] || RegExMatch(SymbolName, "O)__mcode_e_(\w+)")) {
+			if (SymbolName = "__main" || RegExMatch(SymbolName, "O)__mcode_(e|i)_(\w+)")) {
 				Result[SymbolName] := Symbol.Value
 			}
 		}
@@ -128,20 +126,25 @@ class MClib {
 	}
 	
 	Load(pCode, CodeSize, Symbols) {
-		static hKernel32    := DllCall("GetModuleHandle", "Str", "kernel32", "Ptr")
-		static hProcessHeap := DllCall("GetProcessHeap", "Ptr")
-		static HeapAlloc    := DllCall("GetProcAddress", "Ptr", hKernel32, "AStr", "HeapAlloc", "Ptr")
-		static HeapFree     := DllCall("GetProcAddress", "Ptr", hKernel32, "AStr", "HeapFree", "Ptr")
-		
-		OffsetOfhProcessHeap := Symbols["hProcessHeap"]
-		OffsetOfHeapAlloc    := Symbols["HeapAlloc"]
-		OffsetOfHeapFree     := Symbols["HeapFree"]
-		OffsetOfMain         := Symbols["__main"]
-		
-		if (OffsetOfhProcessHeap && OffsetOfHeapAlloc && OffsetOfHeapFree) {
-			NumPut(hProcessHeap, pCode + 0, OffsetOfhProcessHeap, "Ptr")
-			NumPut(HeapAlloc   , pCode + 0, OffsetOfHeapAlloc   , "Ptr")
-			NumPut(HeapFree    , pCode + 0, OffsetOfHeapFree    , "Ptr")
+		for SymbolName, SymbolOffset in Symbols {
+			if (RegExMatch(SymbolName, "O)__mcode_i_(\w+?)_(\w+)", Match)) {
+				DllName := Match[1]
+				FunctionName := Match[2]
+
+				hDll := DllCall("GetModuleHandle", "Str", DllName, "Ptr")
+
+				if (ErrorLevel || A_LastError) {
+					Throw "Could not load dll " DllName ", ErrorLevel " ErrorLevel ", LastError " Format("{:0x}", A_LastError) 
+				}
+
+				pFunction := DllCall("GetProcAddress", "Ptr", hDll, "AStr", FunctionName, "Ptr")
+
+				if (ErrorLevel || A_LastError) {
+					Throw "Could not find function " FunctionName "from " DllName ".dll, ErrorLevel " ErrorLevel ", LastError " Format("{:0x}", A_LastError) 
+				}
+
+				NumPut(pFunction, pCode + 0, SymbolOffset, "Ptr")
+			}
 		}
 		
 		if !DllCall("VirtualProtect", "Ptr", pCode, "Ptr", CodeSize, "UInt", 0x40, "UInt*", OldProtect, "UInt")
@@ -159,7 +162,7 @@ class MClib {
 			return Exports
 		}
 		else {
-			return pCode + OffsetOfMain
+			return pCode + Symbols["__main"]
 		}
 	}
 	
