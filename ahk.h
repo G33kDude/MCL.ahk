@@ -31,16 +31,16 @@ void __main() {};
 #ifdef __cplusplus
 
 void* operator new(size_t size) {
-	return HeapAlloc(hProcessHeap, 0x8, size);
+	return malloc(size);
 }
 void* operator new[](size_t size) {
-	return HeapAlloc(hProcessHeap, 0x8, size);
+	return malloc(size);
 }
 void operator delete(void* Memory) {
-	HeapFree(hProcessHeap, 0, Memory);
+	free(Memory);
 }
 void operator delete[](void* Memory) {
-	HeapFree(hProcessHeap, 0, Memory);
+	free(Memory);
 }
 
 #endif

@@ -87,7 +87,7 @@ class MClib {
 		}
 		
 		shell := ComObjCreate("WScript.Shell")
-		exec := shell.Exec("x86_64-w64-mingw32-" Compiler ".exe -m64" ExtraOptions " -ffreestanding -nostdlib -Wno-attribute-alias -T " LinkerScript " " InputFile " -o " OutputFile)
+		exec := shell.Exec("x86_64-w64-mingw32-" Compiler ".exe -m64" ExtraOptions " -ffreestanding -nostdlib -Wno-attribute-alias -Wl,--image-base -Wl,0x10000000 -T " LinkerScript " " InputFile " -o " OutputFile)
 		exec.StdIn.Close()
 		
 		if !exec.StdErr.AtEndOfStream
