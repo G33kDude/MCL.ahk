@@ -78,44 +78,46 @@ class MClib {
 			ShouldDeleteHeader := true
 		}
 
-		FileOpen(LinkerScript, "w").Write("OUTPUT_FORMAT(pe-x86-64)SECTIONS{.text :{*(.text*)*(.rodata*)*(.rdata*)*(.data*)*(.bss*)}}")
+		try {
+			FileOpen(LinkerScript, "w").Write("OUTPUT_FORMAT(pe-x86-64)SECTIONS{.text :{*(.text*)*(.rodata*)*(.rdata*)*(.data*)*(.bss*)}}")
 
-		FileOpen(InputFile, "w").Write(code)
-		
-		while (!FileExist(InputFile)) {
-			Sleep, 100
-		}
-		
-		shell := ComObjCreate("WScript.Shell")
-		exec := shell.Exec("x86_64-w64-mingw32-" Compiler ".exe -m64" ExtraOptions " -ffreestanding -nostdlib -Wno-attribute-alias -Wl,--image-base -Wl,0x10000000 -T " LinkerScript " " InputFile " -o " OutputFile)
-		exec.StdIn.Close()
-		
-		if !exec.StdErr.AtEndOfStream
-			Throw Exception(exec.StdErr.ReadAll(),, "Compiler Error")
-		
-		while (!FileExist(OutputFile)) {
-			Sleep, 100
-		}
-		
-		FileDelete, % InputFile
-		FileDelete, % LinkerScript
+			FileOpen(InputFile, "w").Write(code)
+			
+			while (!FileExist(InputFile)) {
+				Sleep, 100
+			}
+			
+			shell := ComObjCreate("WScript.Shell")
+			exec := shell.Exec("x86_64-w64-mingw32-" Compiler ".exe -m64" ExtraOptions " -ffreestanding -nostdlib -Wno-attribute-alias -Wl,--image-base -Wl,0x10000000 -T " LinkerScript " " InputFile " -o " OutputFile)
+			exec.StdIn.Close()
+			
+			if !exec.StdErr.AtEndOfStream
+				Throw Exception(StrReplace(exec.StdErr.ReadAll(), " ", " "),, "Compiler Error")
+			
+			while (!FileExist(OutputFile)) {
+				Sleep, 100
+			}
 
-		if (ShouldDeleteHeader) {
-			FileDelete, ahk.h
+			if !(F := FileOpen(OutputFile, "r"))
+				Throw Exception("Failed to load output file")
+			
+			Size := F.Length
+			
+			if !(pPE := DllCall("GlobalAlloc", "UInt", 0, "Ptr", Size, "Ptr"))
+				Throw Exception("Failed to reserve MCLib PE memory")
+			
+			F.RawRead(pPE + 0, Size)
+			F.Close()
 		}
-		
-		if !(F := FileOpen(OutputFile, "r"))
-			Throw Exception("Failed to load output file")
-		
-		Size := F.Length
-		
-		if !(pPE := DllCall("GlobalAlloc", "UInt", 0, "Ptr", Size, "Ptr"))
-			Throw Exception("Failed to reserve MCLib PE memory")
-		
-		F.RawRead(pPE + 0, Size)
-		F.Close()
-		
-		FileDelete, % OutputFile
+		finally {
+			FileDelete, % InputFile
+			FileDelete, % LinkerScript
+			FileDelete, % OutputFile
+
+			if (ShouldDeleteHeader) {
+				FileDelete, ahk.h
+			}
+		}
 		
 		Reader := new PESymbolReader(pPE, Size)
 		Output := Reader.Read()
