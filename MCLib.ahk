@@ -68,6 +68,9 @@ class MClib {
 		return Result
 	}
 
+	static CompilerPrefix := "x86_64-w64-mingw32-"
+	static CompilerSuffix := ".exe"
+
 	Compile(Compiler, Code, ExtraOptions := "") {
 		LinkerScript := MClib.GetTempPath(A_WorkingDir, "mclib-linker-", "")
 		InputFile    := MClib.GetTempPath(A_WorkingDir, "mclib-input-", ".c")
@@ -88,11 +91,12 @@ class MClib {
 			}
 			
 			shell := ComObjCreate("WScript.Shell")
-			exec := shell.Exec("x86_64-w64-mingw32-" Compiler ".exe -m64" ExtraOptions " -ffreestanding -nostdlib -Wno-attribute-alias -Wl,--image-base -Wl,0x10000000 -T " LinkerScript " " InputFile " -o " OutputFile)
+			exec := shell.Exec(MClib.CompilerPrefix Compiler MClib.CompilerSuffix " -m64" ExtraOptions " -ffreestanding -nostdlib -Wno-attribute-alias -Wl,--image-base -Wl,0x10000000 -T " LinkerScript " " InputFile " -o " OutputFile)
 			exec.StdIn.Close()
 			
 			if !exec.StdErr.AtEndOfStream
-				Throw Exception(StrReplace(exec.StdErr.ReadAll(), " ", " "),, "Compiler Error")
+				;Throw Exception(StrReplace(exec.StdErr.ReadAll(), " ", " "),, "Compiler Error")
+				MsgBox, % exec.StdErr.ReadAll()
 			
 			while (!FileExist(OutputFile)) {
 				Sleep, 100

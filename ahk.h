@@ -10,20 +10,25 @@ int __mcode_e_ ## Name () __attribute__((alias(#Name)));
 int __mcode_e_ ## Name () __attribute__((alias(#Name))); \
 ReturnType Name Parameters
 
+#define MCODE_QUOTE(X) #X
+
 #define MCODE_IMPORT(ReturnType, DllName, Name, ParameterTypes) \
-ReturnType (* Name)ParameterTypes; \
-extern void* __attribute__((alias(#Name))) __mcode_i_ ## DllName ## _ ## Name;
+ReturnType (* __mcode_i_ ## DllName ## _ ## Name)ParameterTypes = (ReturnType(*)ParameterTypes)0; \
+static ReturnType __attribute__((alias(MCODE_QUOTE(__mcode_i_ ## DllName ## _ ## Name)))) (*Name) ParameterTypes;
 
 typedef uint64_t size_t;
 typedef int64_t ssize_t;
 
-typedef uint64_t ptrdiff_t;
+typedef int64_t ptrdiff_t;
 typedef uint64_t off_t;
-typedef uint8_t bool;
 
-void* NULL = (void*)0;
-bool true = 1;
-bool false = 0;
+#define NULL (void*)0
+
+#ifndef __cplusplus
+typedef uint8_t bool;
+#define true (bool)1
+#define false (bool)0
+#endif
 
 MCODE_IMPORT(uint64_t, Kernel32, GetProcessHeap, ());
 MCODE_IMPORT(void*, Kernel32, HeapAlloc, (uint64_t, uint32_t, size_t));

@@ -26,8 +26,6 @@
 // slower than MD5.
 //
 
-#include <stddef.h>
-
 #ifdef _MSC_VER
 # define INLINE __forceinline
   typedef  unsigned __int64 uint64;

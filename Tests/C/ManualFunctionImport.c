@@ -1,4 +1,4 @@
-char (*__mcode_i_Shlwapi_StrToIntExW) (short*, int, int*);
+char (*__mcode_i_Shlwapi_StrToIntExW) (short*, int, int*) = (char(*)(short*, int, int*))0;
 
 int __main(short* String) {
     int Result;
