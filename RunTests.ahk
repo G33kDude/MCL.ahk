@@ -94,6 +94,14 @@ class MCLibTests {
             Yunit.Assert(NumGet(pPoint+0, 0, "Int") = 20)
             Yunit.Assert(NumGet(pPoint+0, 4, "Int") = 30)
         }
+
+        Spooky() {
+            pCode := MCLib.FromCPP(Read("Spooky.cpp"))
+
+            Success := DllCall(pCode)
+
+            Yunit.Assert(Success = -1)
+        }
     }
 
     class Packed {

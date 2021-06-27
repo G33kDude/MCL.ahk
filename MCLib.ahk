@@ -142,7 +142,7 @@ class MClib {
 				pFunction := DllCall("GetProcAddress", "Ptr", hDll, "AStr", FunctionName, "Ptr")
 
 				if (ErrorLevel || A_LastError) {
-					Throw "Could not find function " FunctionName "from " DllName ".dll, ErrorLevel " ErrorLevel ", LastError " Format("{:0x}", A_LastError) 
+					Throw "Could not find function " FunctionName " from " DllName ".dll, ErrorLevel " ErrorLevel ", LastError " Format("{:0x}", A_LastError) 
 				}
 
 				NumPut(pFunction, pCode + 0, SymbolOffset, "Ptr")
