@@ -1,20 +1,24 @@
-#ifndef MCODE_INCLUDED
-#define MCODE_INCLUDED
+#ifndef MCLIB_INCLUDED
+#define MCLIB_INCLUDED
 
 #include <stdint.h>
 
-#define MCODE_EXPORT(Name) \
-int __mcode_e_ ## Name () __attribute__((alias(#Name)));
+#define MCLIB_EXPORT(Name) \
+int __MCLIB_e_ ## Name () __attribute__((alias(#Name)));
 
-#define MCODE_EXPORT_INLINE(ReturnType, Name, Parameters) \
-int __mcode_e_ ## Name () __attribute__((alias(#Name))); \
+#define MCLIB_EXPORT_INLINE(ReturnType, Name, Parameters) \
+int __MCLIB_e_ ## Name () __attribute__((alias(#Name))); \
 ReturnType Name Parameters
 
-#define MCODE_QUOTE(X) #X
+#define MCLIB_QUOTE(X) #X
 
-#define MCODE_IMPORT(ReturnType, DllName, Name, ParameterTypes) \
-ReturnType (* __mcode_i_ ## DllName ## _ ## Name)ParameterTypes = (ReturnType(*)ParameterTypes)0; \
-static ReturnType __attribute__((alias(MCODE_QUOTE(__mcode_i_ ## DllName ## _ ## Name)))) (*Name) ParameterTypes;
+#define MCLIB_IMPORT(ReturnType, DllName, Name, ParameterTypes) \
+ReturnType (* __MCLIB_i_ ## DllName ## _ ## Name)ParameterTypes = (ReturnType(*)ParameterTypes)0; \
+static ReturnType __attribute__((alias(MCLIB_QUOTE(__MCLIB_i_ ## DllName ## _ ## Name)))) (*Name) ParameterTypes;
+
+#ifdef MCLIB_LIBRARY
+void __main() {};
+#endif
 
 typedef uint64_t size_t;
 typedef int64_t ssize_t;
@@ -30,10 +34,19 @@ typedef uint8_t bool;
 #define false (bool)0
 #endif
 
-MCODE_IMPORT(uint64_t, Kernel32, GetProcessHeap, ());
-MCODE_IMPORT(void*, Kernel32, HeapAlloc, (uint64_t, uint32_t, size_t));
-MCODE_IMPORT(void*, Kernel32, HeapReAlloc, (uint64_t, uint32_t, void*, size_t));
-MCODE_IMPORT(void, Kernel32, HeapFree, (uint64_t, uint32_t, void*));
+#ifdef MCLIB_FORWARD_STDLIB
+#define MCLIB_MEMORY
+#define MCLIB_FORWARD_STDLIB_FILE
+#define MCLIB_FORWARD_STDLIB_STRING
+#define MCLIB_FORWARD_STDLIB_TIME
+#define MCLIB_FORWARD_STDLIB_ERROR
+#endif
+
+#ifdef MCLIB_MEMORY
+MCLIB_IMPORT(uint64_t, Kernel32, GetProcessHeap, ());
+MCLIB_IMPORT(void*, Kernel32, HeapAlloc, (uint64_t, uint32_t, size_t));
+MCLIB_IMPORT(void*, Kernel32, HeapReAlloc, (uint64_t, uint32_t, void*, size_t));
+MCLIB_IMPORT(void, Kernel32, HeapFree, (uint64_t, uint32_t, void*));
 
 void* malloc(size_t Size) {
 	return HeapAlloc(GetProcessHeap(), 0x8, Size);
@@ -71,16 +84,18 @@ void* memset(void* To, int Value, size_t Count) {
 	return To;
 }
 
-MCODE_IMPORT(int, msvcrt, memcmp, (const void*, const void*, size_t));
+int memcmp(const void* Left, const void* Right, size_t Count) {
+	asm("cld\n\t" \
+		"repe cmpsb\n\t" \
+        "mov 0, %%eax\n\t" \
+        "cmovl -1, %%eax\n\t" \
+        "cmovg 1, %%eax\n\t" \
+        "ret"
+		:: "D"(Left), "S"(Right), "c"(Count)
+	);
 
-#define max(a, b) ((a) > (b) ? (a) : (b))
-#define min(a, b) ((a) > (b) ? (b) : (a))
-
-#define M_SQRT2 1.41421356237309504880
-
-#ifdef MCODE_LIBRARY
-void __main() {};
-#endif
+    return 0;
+}
 
 #ifdef __cplusplus
 void* operator new(size_t size) {
@@ -96,34 +111,21 @@ void operator delete[](void* Memory) {
 	free(Memory);
 }
 #endif // __cplusplus
+#endif // MCLIB_MEMORY
 
-#ifdef MCODE_FORWARD_STDLIB
-#define MCODE_FORWARD_STDLIB_FILE
-#define MCODE_FORWARD_STDLIB_STRING
-#define MCODE_FORWARD_STDLIB_TIME
-#define MCODE_FORWARD_STDLIB_ERROR
-#endif
-
-#include <stdarg.h>
-
-#define PRIx8     "hhx"
-#define PRIx16    "hx"
-#define PRIx32    "lx"
-#define PRIx64    "llx"
-
-#ifdef MCODE_FORWARD_STDLIB_FILE
+#ifdef MCLIB_FORWARD_STDLIB_FILE
 typedef struct {
 	char Dummy;
 } FILE;
 
-MCODE_IMPORT(FILE*, msvcrt, fopen, (const char*, const char*));
-MCODE_IMPORT(long int, msvcrt, ftell, (FILE*));
-MCODE_IMPORT(int, msvcrt, fseek, (FILE*, long int, int));
-MCODE_IMPORT(size_t, msvcrt, fwrite, (const void*, size_t, size_t, FILE*));
-MCODE_IMPORT(int, msvcrt, fputs, (char*, FILE*));
-MCODE_IMPORT(size_t, msvcrt, fread, (void*, size_t, size_t, FILE*));
-MCODE_IMPORT(int, msvcrt, fprintf, (FILE*, char*, ...));
-MCODE_IMPORT(int, msvcrt, fclose, (FILE*));
+MCLIB_IMPORT(FILE*, msvcrt, fopen, (const char*, const char*));
+MCLIB_IMPORT(long int, msvcrt, ftell, (FILE*));
+MCLIB_IMPORT(int, msvcrt, fseek, (FILE*, long int, int));
+MCLIB_IMPORT(size_t, msvcrt, fwrite, (const void*, size_t, size_t, FILE*));
+MCLIB_IMPORT(int, msvcrt, fputs, (char*, FILE*));
+MCLIB_IMPORT(size_t, msvcrt, fread, (void*, size_t, size_t, FILE*));
+MCLIB_IMPORT(int, msvcrt, fprintf, (FILE*, char*, ...));
+MCLIB_IMPORT(int, msvcrt, fclose, (FILE*));
 
 #define SEEK_SET 0
 #define SEEK_CUR 1
@@ -152,27 +154,27 @@ int fstat(uint64_t FileHandle, struct stat* Output) {
 	return 0;
 }
 
-#endif // MCODE_FORWARD_STDLIB_FILE
+#endif // MCLIB_FORWARD_STDLIB_FILE
 
-#ifdef MCODE_FORWARD_STDLIB_STRING
-MCODE_IMPORT(int, msvcrt, isspace, (int));
-MCODE_IMPORT(int, msvcrt, tolower, (int));
-MCODE_IMPORT(int, msvcrt, toupper, (int));
+#ifdef MCLIB_FORWARD_STDLIB_STRING
+MCLIB_IMPORT(int, msvcrt, isspace, (int));
+MCLIB_IMPORT(int, msvcrt, tolower, (int));
+MCLIB_IMPORT(int, msvcrt, toupper, (int));
 
-MCODE_IMPORT(int, msvcrt, strlen, (const char*));
-MCODE_IMPORT(int, msvcrt, strcmp, (const char*, const char*));
-MCODE_IMPORT(int, msvcrt, strncmp, (const char*, const char*, size_t));
-MCODE_IMPORT(char, msvcrt, strcpy, (char*, const char*));
-MCODE_IMPORT(char*, msvcrt, strchr, (const char*, int));
-MCODE_IMPORT(char*, msvcrt, strrchr, (const char*, int));
-MCODE_IMPORT(char*, msvcrt, strncpy, (char*, const char*, size_t));
+MCLIB_IMPORT(int, msvcrt, strlen, (const char*));
+MCLIB_IMPORT(int, msvcrt, strcmp, (const char*, const char*));
+MCLIB_IMPORT(int, msvcrt, strncmp, (const char*, const char*, size_t));
+MCLIB_IMPORT(char, msvcrt, strcpy, (char*, const char*));
+MCLIB_IMPORT(char*, msvcrt, strchr, (const char*, int));
+MCLIB_IMPORT(char*, msvcrt, strrchr, (const char*, int));
+MCLIB_IMPORT(char*, msvcrt, strncpy, (char*, const char*, size_t));
 
-MCODE_IMPORT(char*, msvcrt, strerror, (int));
+MCLIB_IMPORT(char*, msvcrt, strerror, (int));
 
-MCODE_IMPORT(int, msvcrt, sscanf, (char*, char*, ...));
-MCODE_IMPORT(int, msvcrt, sprintf, (char*, const char*, ...));
-MCODE_IMPORT(int, msvcrt, vsprintf, (char*, const char*, va_list));
-MCODE_IMPORT(int, msvcrt, vsnprintf, (char*, size_t, const char*, va_list));
+MCLIB_IMPORT(int, msvcrt, sscanf, (char*, char*, ...));
+MCLIB_IMPORT(int, msvcrt, sprintf, (char*, const char*, ...));
+MCLIB_IMPORT(int, msvcrt, vsprintf, (char*, const char*, va_list));
+MCLIB_IMPORT(int, msvcrt, vsnprintf, (char*, size_t, const char*, va_list));
 
 int strcasecmp(const char* Left, const char* Right) {
 	int ca, cb;
@@ -188,13 +190,13 @@ int strcasecmp(const char* Left, const char* Right) {
 
 	return ca - cb;
 }
-#endif // MCODE_FORWARD_STDLIB_STRING
+#endif // MCLIB_FORWARD_STDLIB_STRING
 
-#ifdef MCODE_FORWARD_STDLIB_TIME
+#ifdef MCLIB_FORWARD_STDLIB_TIME
 
 typedef uint64_t time_t;
 
-MCODE_IMPORT(time_t, msvcrt, time, (time_t*));
+MCLIB_IMPORT(time_t, msvcrt, time, (time_t*));
 
 struct tm {
    int tm_sec;         /* seconds,  range 0 to 59          */
@@ -208,7 +210,7 @@ struct tm {
    int tm_isdst;       /* daylight saving time             */	
 };
 
-MCODE_IMPORT(int, msvcrt, _localtime32_s, (struct tm*, const time_t*));
+MCLIB_IMPORT(int, msvcrt, _localtime32_s, (struct tm*, const time_t*));
 
 struct tm* localtime_r(const time_t* Time, struct tm* Output) {
 	_localtime32_s(Output, Time);
@@ -222,10 +224,10 @@ struct tm* localtime(const time_t* Time) {
 	return localtime_r(Time, Result);
 }
 
-MCODE_IMPORT(size_t, msvcrt, strftime, (char*, size_t, const char*, const struct tm*));
-#endif // MCODE_FORWARD_STDLIB_TIME
+MCLIB_IMPORT(size_t, msvcrt, strftime, (char*, size_t, const char*, const struct tm*));
+#endif // MCLIB_FORWARD_STDLIB_TIME
 
-#ifdef MCODE_FORWARD_STDLIB_ERROR
+#ifdef MCLIB_FORWARD_STDLIB_ERROR
 #define EPERM           1
 #define ENOENT          2
 #define EBADF           9
@@ -337,6 +339,6 @@ MCODE_IMPORT(size_t, msvcrt, strftime, (char*, size_t, const char*, const struct
 
 int errno = 0;
 
-#endif // MCODE_FORWARD_STDLIB_ERROR
+#endif // MCLIB_FORWARD_STDLIB_ERROR
 
-#endif // MCODE_INCLUDED
+#endif // MCLIB_INCLUDED

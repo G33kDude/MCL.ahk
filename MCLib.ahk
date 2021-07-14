@@ -60,7 +60,7 @@ class MClib {
 		Result := {}
 
 		for SymbolName, Symbol in Symbols {
-			if (SymbolName = "__main" || RegExMatch(SymbolName, "O)__mcode_(e|i)_(\w+)")) {
+			if (SymbolName = "__main" || RegExMatch(SymbolName, "O)__MCLIB_(e|i)_(\w+)")) {
 				Result[SymbolName] := Symbol.Value
 			}
 		}
@@ -91,12 +91,11 @@ class MClib {
 			}
 			
 			shell := ComObjCreate("WScript.Shell")
-			exec := shell.Exec(MClib.CompilerPrefix Compiler MClib.CompilerSuffix " -m64" ExtraOptions " -ffreestanding -nostdlib -Wno-attribute-alias -Wl,--image-base -Wl,0x10000000 -T " LinkerScript " " InputFile " -o " OutputFile)
+			exec := shell.Exec(MClib.CompilerPrefix Compiler MClib.CompilerSuffix " -m64 " InputFile " -o " OutputFile ExtraOptions " -ffreestanding -nostdlib -Wno-attribute-alias -T " LinkerScript " -Wl,--image-base -Wl,0x10000000 -Wl,-Ttext=0x5000 -Wl,--defsym -Wl,.text_offset=0x5000")
 			exec.StdIn.Close()
 			
 			if !exec.StdErr.AtEndOfStream
-				;Throw Exception(StrReplace(exec.StdErr.ReadAll(), " ", " "),, "Compiler Error")
-				MsgBox, % exec.StdErr.ReadAll()
+				Throw Exception(StrReplace(exec.StdErr.ReadAll(), " ", " "),, "Compiler Error")
 			
 			while (!FileExist(OutputFile)) {
 				Sleep, 100
@@ -128,12 +127,12 @@ class MClib {
 		
 		pCode := pPE + Output.SectionsByName[".text"].FileOffset
 
-		return [pCode, Output.SectionsByName[".text"].FileSize, this.NormalizeSymbols(Output.AbsoluteSymbols)]
+		return [pCode, Output.SectionsByName[".text"].FileSize, this.NormalizeSymbols(Output.AbsoluteSymbols), Output.Relocations]
 	}
 	
-	Load(pCode, CodeSize, Symbols) {
+	Load(pCode, CodeSize, Symbols, Relocations) {
 		for SymbolName, SymbolOffset in Symbols {
-			if (RegExMatch(SymbolName, "O)__mcode_i_(\w+?)_(\w+)", Match)) {
+			if (RegExMatch(SymbolName, "O)__MCLIB_i_(\w+?)_(\w+)", Match)) {
 				DllName := Match[1]
 				FunctionName := Match[2]
 
@@ -152,6 +151,11 @@ class MClib {
 				NumPut(pFunction, pCode + 0, SymbolOffset, "Ptr")
 			}
 		}
+
+		for k, Offset in Relocations {
+			Old := NumGet(pCode + 0, Offset, "Ptr")
+			NumPut(Old + pCode, pCode + 0, Offset, "Ptr")
+		}
 		
 		if !DllCall("VirtualProtect", "Ptr", pCode, "Ptr", CodeSize, "UInt", 0x40, "UInt*", OldProtect, "UInt")
 			Throw Exception("Failed to mark MCLib memory as executable")
@@ -159,7 +163,7 @@ class MClib {
 		Exports := {}
 
 		for SymbolName, SymbolOffset in Symbols {
-			if (RegExMatch(SymbolName, "O)__mcode_e_(\w+)", Match)) {
+			if (RegExMatch(SymbolName, "O)__MCLIB_e_(\w+)", Match)) {
 				Exports[Match[1]] := pCode + SymbolOffset
 			}
 		}
@@ -180,7 +184,7 @@ class MClib {
 		return this.Load(this.Compile("g++", "extern ""C"" {`n" Code "`n}", " -fno-exceptions -fno-rtti")*)
 	}
 	
-	Pack(FormatAsStringLiteral, pCode, CodeSize, Symbols) {
+	Pack(FormatAsStringLiteral, pCode, CodeSize, Symbols, Relocations) {
 
 		; First, compress the actual code bytes
 		CompressionBufferSize := VarSetCapacity(CompressionBuffer, CodeSize * 2, 0)
@@ -209,6 +213,22 @@ class MClib {
 			, "UInt") ; BOOL
 			throw Exception("Failed to convert to b64")
 
+		SymbolsString := ""
+
+		for SymbolName, SymbolOffset in Symbols {
+			SymbolsString .= SymbolName ":" SymbolOffset ","
+		}
+
+		SymbolsString .= "__size:" CodeSize
+
+		RelocationsString := ""
+
+		for k, RelocationOffset in Relocations {
+			RelocationsString .= RelocationOffset ","
+		}
+
+		RelocationsString := SubStr(RelocationsString, 1, -1)
+
 		; And finally, format our output
 		
 		if (FormatAsStringLiteral) {
@@ -219,28 +239,12 @@ class MClib {
 				Base64 := SubStr(Base64, (120-8)+1)
 			}
 
-			Header := """V0;"
-
-			for SymbolName, SymbolOffset in Symbols {
-				Header .= SymbolName "-" SymbolOffset ","
-			}
-
-			Header .= "__size-" CodeSize
-
-			return Header ";""" Out
+			return """V01;" SymbolsString ";" RelocationsString ";""" Out
 		}
 		else {
 			; Don't format the output, return the string that would result from AHK parsing the string literal returned when `FormatAsStringLiteral` is true
 
-			Header := "V0;"
-
-			for SymbolName, SymbolOffset in Symbols {
-				Header .= SymbolName "-" SymbolOffset ","
-			}
-
-			Header .= "__size-" CodeSize
-
-			return Header ";" Base64
+			return "V01;" SymbolsString ";" RelocationsString ";" Base64
 		}
 	}
 	
@@ -253,18 +257,29 @@ class MClib {
 	}
 
 	FromString(Code) {
-		Parts := StrSplit(Code, ";")
+		Formats := {"V0": 3, "V0.1": 4}
 
-		if (Parts[1] != "V0") {
-			Throw "Unknown MClib packed code format"
+		Parts := StrSplit(Code, ";")
+		Version := Parts[1]
+
+		if (Formats.HasKey(Version) && Parts.Count() = Formats[Version] ) {
+			Throw "Unknown/corrupt MClib packed code format"
 		}
 
 		Symbols := {}
 
 		for k, SymbolEntry in StrSplit(Parts[2], ",") {
-			SymbolEntry := StrSplit(SymbolEntry, "-")
+			SymbolEntry := StrSplit(SymbolEntry, ":")
 
 			Symbols[SymbolEntry[1]] := SymbolEntry[2]
+		}
+
+		Relocations := []
+
+		if (Version != "V0") {
+			for k, Relocation in StrSplit(Parts[3], ",") {
+				Relocations.Push(Relocation)
+			}
 		}
 
 		CodeBase64 := Parts[3]
@@ -287,6 +302,6 @@ class MClib {
 
 		MClib.LZ.Decompress(pDecompressionBuffer, CompressedSize, pBinary, DecompressedSize)
 		
-		return MClib.Load(pBinary, DecompressedSize, Symbols)
+		return MClib.Load(pBinary, DecompressedSize, Symbols, Relocations)
 	}
 }

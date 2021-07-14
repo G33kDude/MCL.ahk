@@ -79,6 +79,18 @@ class MCLibTests {
             
             Yuint.Assert(ReferenceHash == ActualHash)
         }
+
+        Relocations() {
+            pCode := MCLib.FromC(Read("Relocations.c"))
+
+            for k, String in ["Hello", "Goodbye", "dog", "cat"] {
+                pEntry := DllCall(pCode, "Int", k - 1, "Ptr")
+
+                pString := NumGet(pEntry + 0, 0, "Ptr")
+
+                Yunit.Asser(StrGet(pString, "UTF-8") = String)
+            }
+        }
     }
 
     class CPP {

@@ -75,7 +75,7 @@ class PESymbolReader extends SymbolReaderBase {
 			
 			SectionsByName[NextSection.Name] := NextSection
 		}
-		
+
 		SymbolTableOffset := this.ReadUInt(8)
 		SymbolCount := this.ReadUInt(12)
 		SymbolNamesOffset := SymbolTableOffset + (SymbolCount * SIZEOF_SYMBOL)
@@ -92,7 +92,56 @@ class PESymbolReader extends SymbolReaderBase {
 			
 			SymbolIndex += 1 + NextSymbol.AuxSymbolCount
 		}
+
+		TextSection := SectionsByName[".text"]
+
+		RelocationSecton := SectionsByName[".reloc"]
+		Relocations := []
+
+		if (RelocationSecton && SymbolsByName[".text_offset"]) {
+			TextOffset := SymbolsByName[".text_offset"].Value
+			ImageBase := TextSection.VirtualAddress - TextOffset
+
+			RelocationsOffset := 0
+
+			while (RelocationsOffset < RelocationSecton.FileSize) {
+				RelocationPage := this.ReadUInt(RelocationSecton.FileOffset + RelocationsOffset)
+				RelocationsOffset += 4
+
+				PageRelocationCount := (this.ReadUInt(RelocationSecton.FileOffset + RelocationsOffset) - 8) / 2
+				RelocationsOffset += 4
+
+				loop, % PageRelocationCount {
+					Relocation := this.ReadUShort(RelocationSecton.FileOffset + RelocationsOffset)
+					RelocationsOffset += 2
+
+					RelocationType := (Relocation >> 12) & 0xF
+					RelocationAddress := (RelocationPage + (Relocation & 0xFFF))
+					RelocationOffset := RelocationAddress - TextSection.VirtualAddress
+
+					if (RelocationOffset < 0 || RelocationOffset > TextSection.FileSize) {
+						continue
+					}
+					else if (RelocationType = 0) {
+						continue
+					}
+					else if (RelocationType != 10) {
+						throw "Unknown relocation type '" RelocationType "'"
+					}
+
+					Relocations.Push(RelocationOffset)
+
+					; This relocation currently has an RVA in place of an actual address, which makes it easy to relocate in an actual
+					;  image. But since this code is loaded as if `.text` goes at RVA 0, we need to translate the RVA into a `.text`
+					;   based offset.
+
+					OldValue := this.ReadPtr(TextSection.FileOffset + RelocationOffset)
+					OldValue -= TextOffset
+					NumPut(OldValue, this.pData + 0, TextSection.FileOffset + RelocationOffset, "Ptr")
+				}
+			}
+		}
 		
-		return {"AbsoluteSymbols": SymbolsByName, "Symbols": Symbols, "Sections": Sections, "SectionsByName": SectionsByName}
+		return {"AbsoluteSymbols": SymbolsByName, "Symbols": Symbols, "Sections": Sections, "SectionsByName": SectionsByName, "Relocations": Relocations}
 	}
 }
