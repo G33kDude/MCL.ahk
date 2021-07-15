@@ -2,7 +2,7 @@
 $Name() {
 	static CodeBase64 := $CodeBase64
 	static CodeSize := $CodeSize
-	static Code := $Name()
+	static Code := false
 
 	if (!Code) {
 		if !DllCall("Crypt32\CryptStringToBinary", "Str", CodeBase64, "UInt", 0, "UInt", 1, "UPtr", 0, "UInt*", CompressedSize, "Ptr", 0, "Ptr", 0, "UInt")
@@ -22,12 +22,17 @@ $Name() {
 $HasImports
 		for ImportName, ImportOffset in $Imports {
 			Import := StrSplit(ImportName, "_")
+			
 			hDll := DllCall("GetModuleHandle", "Str", Import[1], "Ptr")
+
 			if (ErrorLevel || A_LastError)
 				Throw "Could not load dll " Import[1] ", ErrorLevel " ErrorLevel ", LastError " Format("{:0x}", A_LastError) 
+			
 			pFunction := DllCall("GetProcAddress", "Ptr", hDll, "AStr", Import[2], "Ptr")
+
 			if (ErrorLevel || A_LastError)
 				Throw "Could not find function " Import[2] " from " Import[1] ".dll, ErrorLevel " ErrorLevel ", LastError " Format("{:0x}", A_LastError) 
+			
 			NumPut(pFunction, pCode + 0, ImportOffset, "Ptr")
 		}
 $HasImports
@@ -49,10 +54,10 @@ $HasExports
 			Exports[ExportName] := pCode + SymbolOffset
 		}
 
-		return Exports
+		Code := Exports
 $HasExports
 $HasNoExports
-		return pCode + $MainOffset
+		Code := pCode + $MainOffset
 $HasNoExports
 	}
 

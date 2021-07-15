@@ -111,10 +111,10 @@ class MClib {
 	static CompilerSuffix := ".exe"
 
 	Compile(Compiler, Code, ExtraOptions := "") {
-		LinkerScript  := MClib.GetTempPath(A_WorkingDir, "mclib-linker-", "")
-		IncludeFolder := MClib.GetTempPath(A_WorkingDir, "mclib-include-", "")
-		InputFile     := MClib.GetTempPath(A_WorkingDir, "mclib-input-", ".c")
-		OutputFile    := MClib.GetTempPath(A_WorkingDir, "mclib-output-", ".bin")
+		LinkerScript  := this.GetTempPath(A_WorkingDir, "mclib-linker-", "")
+		IncludeFolder := this.GetTempPath(A_WorkingDir, "mclib-include-", "")
+		InputFile     := this.GetTempPath(A_WorkingDir, "mclib-input-", ".c")
+		OutputFile    := this.GetTempPath(A_WorkingDir, "mclib-output-", ".bin")
 
 		try {
 			FileOpen(LinkerScript, "w").Write("OUTPUT_FORMAT(pe-x86-64)SECTIONS{.text :{*(.text*)*(.rodata*)*(.rdata*)*(.data*)*(.bss*)}}")
@@ -128,7 +128,7 @@ class MClib {
 			FileCopyDir, %A_LineFile%/../include, % IncludeFolder
 			
 			shell := ComObjCreate("WScript.Shell")
-			exec := shell.Exec(MClib.CompilerPrefix Compiler MClib.CompilerSuffix " -m64 " InputFile " -o " OutputFile ExtraOptions " -ffreestanding -nostdlib -Wno-attribute-alias -T " LinkerScript " -Wl,--image-base -Wl,0x10000000 -Wl,-Ttext=0x5000 -Wl,--defsym -Wl,.text_offset=0x5000 -I " IncludeFolder)
+			exec := shell.Exec(this.CompilerPrefix Compiler this.CompilerSuffix " -m64 " InputFile " -o " OutputFile ExtraOptions " -ffreestanding -nostdlib -Wno-attribute-alias -T " LinkerScript " -Wl,--image-base -Wl,0x10000000 -Wl,-Ttext=0x5000 -Wl,--defsym -Wl,.text_offset=0x5000 -I " IncludeFolder)
 			exec.StdIn.Close()
 			
 			if !exec.StdErr.AtEndOfStream
@@ -321,7 +321,7 @@ class MClib {
 		FileRead, Template, %A_LineFile%/../StandaloneTemplate.ahk
 
 		Template := StrReplace(Template, "$Name", Name)
-		Template := StrReplace(Template, "$CodeBase64", """" Out)
+		Template := StrReplace(Template, "$CodeBase64", """""" Out)
 		Template := StrReplace(Template, "$CodeSize", CodeSize)
 
 		Template := this.DoTemplateBlock(Template, "Imports", Imports)
@@ -387,8 +387,8 @@ class MClib {
 			throw Exception("Failed to reserve MCLib memory")
 
 		Decoded := this.Base64.Decode(CodeBase64)
-		MClib.LZ.Decompress(Decoded.pData, Decoded.Size, pBinary, DecompressedSize)
+		this.LZ.Decompress(Decoded.pData, Decoded.Size, pBinary, DecompressedSize)
 		
-		return MClib.Load(pBinary, DecompressedSize, Symbols, Relocations)
+		return this.Load(pBinary, DecompressedSize, Symbols, Relocations)
 	}
 }
