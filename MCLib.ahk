@@ -2,8 +2,7 @@
 
 class MClib {
 	class LZ {
-		Compress(pData, cbData, pCData, cbCData)
-		{
+		Compress(pData, cbData, pCData, cbCData) {
 			if (r := DllCall("ntdll\RtlGetCompressionWorkSpaceSize"
 				, "UShort", 0x102                        ; USHORT CompressionFormatAndEngine
 				, "UInt*", compressBufferWorkSpaceSize   ; PULONG CompressBufferWorkSpaceSize
@@ -28,8 +27,7 @@ class MClib {
 			return finalCompressedSize
 		}
 
-		Decompress(pCData, cbCData, pData, cbData)
-		{
+		Decompress(pCData, cbCData, pData, cbData) {
 			if (r := DllCall("ntdll\RtlDecompressBuffer"
 				, "UShort",  0x102 ; USHORT CompressionFormat
 				, "Ptr", pData     ; PUCHAR UncompressedBuffer
@@ -41,6 +39,47 @@ class MClib {
 				throw Exception("Error calling RtlDecompressBuffer",, Format("0x{:08x}", r))
 			
 			return cbFinal
+		}
+	}
+
+	class Base64 {
+		Encode(pData, Size) {
+			if !DllCall("Crypt32\CryptBinaryToString"
+				, "Ptr", pData       ; const BYTE *pbBinary
+				, "UInt", Size     ; DWORD      cbBinary
+				, "UInt", 0x40000001 ; DWORD      dwFlags = CRYPT_STRING_BASE64 | CRYPT_STRING_NOCRLF
+				, "Ptr", 0           ; LPWSTR     pszString
+				, "UInt*", Base64Length    ; DWORD      *pcchString
+				, "UInt") ; BOOL
+				throw Exception("Failed to calculate b64 size")
+			
+			VarSetCapacity(Base64, Base64Length * (1 + A_IsUnicode), 0)
+			
+			if !DllCall("Crypt32\CryptBinaryToString"
+				, "Ptr", pData       ; const BYTE *pbBinary
+				, "UInt", Size     ; DWORD      cbBinary
+				, "UInt", 0x40000001 ; DWORD      dwFlags = CRYPT_STRING_BASE64 | CRYPT_STRING_NOCRLF
+				, "Str", Base64         ; LPWSTR     pszString
+				, "UInt*", Base64Length    ; DWORD      *pcchString
+				, "UInt") ; BOOL
+				throw Exception("Failed to convert to b64")
+
+			return Base64
+		}
+
+		Decode(Base64) {
+			if !DllCall("Crypt32\CryptStringToBinary", "Str", Base64, "UInt", 0, "UInt", 1
+				, "UPtr", 0, "UInt*", DecodedSize, "Ptr", 0, "Ptr", 0, "UInt")
+				throw Exception("Failed to parse b64 to binary")
+			
+			DecodedSize := VarSetCapacity(DecodeBuffer, DecodedSize, 0)
+			pDecodeBuffer := &DecodeBuffer
+
+			if !DllCall("Crypt32\CryptStringToBinary", "Str", Base64, "UInt", 0, "UInt", 1
+				, "Ptr", pDecodeBuffer, "UInt*", DecodedSize, "Ptr", 0, "Ptr", 0, "UInt")
+				throw Exception("Failed to convert b64 to binary")
+
+			return {"pData": pDecodeBuffer, "Size": Size}
 		}
 	}
 
@@ -76,11 +115,6 @@ class MClib {
 		IncludeFolder := MClib.GetTempPath(A_WorkingDir, "mclib-include-", "")
 		InputFile     := MClib.GetTempPath(A_WorkingDir, "mclib-input-", ".c")
 		OutputFile    := MClib.GetTempPath(A_WorkingDir, "mclib-output-", ".bin")
-
-		if (!FileExist("ahk.h")) {
-			FileCopy, %A_LineFile%/../ahk.h, ahk.h
-			ShouldDeleteHeader := true
-		}
 
 		try {
 			FileOpen(LinkerScript, "w").Write("OUTPUT_FORMAT(pe-x86-64)SECTIONS{.text :{*(.text*)*(.rodata*)*(.rdata*)*(.data*)*(.bss*)}}")
@@ -121,10 +155,6 @@ class MClib {
 			FileDelete, % OutputFile
 
 			FileRemoveDir, % IncludeFolder, 1
-
-			if (ShouldDeleteHeader) {
-				FileDelete, ahk.h
-			}
 		}
 		
 		Reader := new PESymbolReader(pPE, Size)
@@ -195,28 +225,8 @@ class MClib {
 		CompressionBufferSize := VarSetCapacity(CompressionBuffer, CodeSize * 2, 0)
 		pCompressionBuffer := &CompressionBuffer
 
-		CompressedSize := MClib.LZ.Compress(pCode, CodeSize, pCompressionBuffer, CompressionBufferSize)
-		
-		; Then, convert the compressed code to Base64
-		if !DllCall("Crypt32\CryptBinaryToString"
-			, "Ptr", pCompressionBuffer       ; const BYTE *pbBinary
-			, "UInt", CompressedSize     ; DWORD      cbBinary
-			, "UInt", 0x40000001 ; DWORD      dwFlags = CRYPT_STRING_BASE64 | CRYPT_STRING_NOCRLF
-			, "Ptr", 0           ; LPWSTR     pszString
-			, "UInt*", Base64Length    ; DWORD      *pcchString
-			, "UInt") ; BOOL
-			throw Exception("Failed to calculate b64 size")
-		
-		VarSetCapacity(Base64, Base64Length * (1 + A_IsUnicode), 0)
-		
-		if !DllCall("Crypt32\CryptBinaryToString"
-			, "Ptr", pCompressionBuffer       ; const BYTE *pbBinary
-			, "UInt", CompressedSize     ; DWORD      cbBinary
-			, "UInt", 0x40000001 ; DWORD      dwFlags = CRYPT_STRING_BASE64 | CRYPT_STRING_NOCRLF
-			, "Str", Base64         ; LPWSTR     pszString
-			, "UInt*", Base64Length    ; DWORD      *pcchString
-			, "UInt") ; BOOL
-			throw Exception("Failed to convert to b64")
+		CompressedSize := this.LZ.Compress(pCode, CodeSize, pCompressionBuffer, CompressionBufferSize)
+		Base64 := this.Base64.Encode(pCompressionBuffer, CompressedSize)
 
 		SymbolsString := ""
 
@@ -252,14 +262,93 @@ class MClib {
 			return "V0.1;" SymbolsString ";" RelocationsString ";" Base64
 		}
 	}
+
+	DoTemplateBlock(Template, BlockName, Values, AsArray := false) {
+		; If Values is not empty, this function populates $BlockName with Values stringified, and
+		;  preserves anything inside $HasBlockName...$HasBlockName, removing anything between
+		;   $HasNoBlockName...$HasNoBlockName
+
+		; If values is empty, the opposite is done, removing $HasBlockName...$HasBlockName and
+		;  keeping $HasNoBlockName...$HasNoBlockName
+
+		if (Values.Count()) {
+			Template := RegExReplace(Template, "s)\$HasNo" BlockName ".*?\$HasNo" BlockName)
+			Template := StrReplace(Template, "$Has" BlockName)
+
+			ValuesString := AsArray ? "[" : "{"
+
+			for k, v in Values {
+				ValuesString .= (AsArray ? v : """" k """: " v) ", "
+			}
+
+			ValuesString := SubStr(ValuesString, 1, -2) (AsArray ? "]" : "}")
+
+			Template := StrReplace(Template, "$" BlockName, ValuesString)
+		}
+		else {
+			Template := StrReplace(Template, "$HasNo" BlockName)
+			Template := RegExReplace(Template, "s)\$Has" BlockName ".*?\$Has" BlockName)
+		}
+
+		return Template
+	}
+
+	StandalonePack(Name, pCode, CodeSize, Symbols, Relocations) {
+		; First, compress the actual code bytes
+		CompressionBufferSize := VarSetCapacity(CompressionBuffer, CodeSize * 2, 0)
+		pCompressionBuffer := &CompressionBuffer
+
+		CompressedSize := this.LZ.Compress(pCode, CodeSize, pCompressionBuffer, CompressionBufferSize)
+		Base64 := this.Base64.Encode(pCompressionBuffer, CompressedSize)
+
+		Imports := {}
+		Exports := {}
+
+		for SymbolName, SymbolOffset in Symbols {
+			if (RegExMatch(SymbolName, "O)__MCLIB_i_(\w+)_(\w+)", Match)) {
+				Imports[Match[1] "_" Match[2]] := SymbolOffset
+			}
+			else if (RegExMatch(SymbolName, "O)__MCLIB_e_(\w+)", Match)) {
+				Exports[Match[1]] := SymbolOffset
+			}
+		}
+
+		while StrLen(Base64) {
+			Out .= "`n. """ SubStr(Base64, 1, 120-8) """"
+			Base64 := SubStr(Base64, (120-8)+1)
+		}
+
+		FileRead, Template, %A_LineFile%/../StandaloneTemplate.ahk
+
+		Template := StrReplace(Template, "$Name", Name)
+		Template := StrReplace(Template, "$CodeBase64", """" Out)
+		Template := StrReplace(Template, "$CodeSize", CodeSize)
+
+		Template := this.DoTemplateBlock(Template, "Imports", Imports)
+		Template := this.DoTemplateBlock(Template, "Relocations", Relocations, true)
+		Template := this.DoTemplateBlock(Template, "Exports", Exports)
+
+		Template := StrReplace(Template, "$MainOffset", Symbols["__main"])
+
+		Template := RegexReplace(Template, "\n\s*\n")
+
+		return Template
+	}
 	
 	AHKFromC(Code, FormatAsStringLiteral := true) {
 		return this.Pack(FormatAsStringLiteral, this.Compile("gcc", Code)*)
+	}
+	StandaloneAHKFromC(Code, Name := "MyMCLibC") {
+		return this.StandalonePack(Name, this.Compile("gcc", Code)*)
 	}
 	
 	AHKFromCPP(Code, FormatAsStringLiteral := true) {
 		return this.Pack(FormatAsStringLiteral, this.Compile("g++", "extern ""C"" {`n" Code "`n}", " -fno-exceptions -fno-rtti")*)
 	}
+	StandaloneAHKFromCPP(Code, Name := "MyMCLibCPP") {
+		return this.StandalonePack(Name, this.Compile("g++", "extern ""C"" {`n" Code "`n}", " -fno-exceptions -fno-rtti")*)
+	}
+
 
 	FromString(Code) {
 		Formats := {"V0": 3, "V0.1": 4}
@@ -293,22 +382,12 @@ class MClib {
 		}		
 
 		DecompressedSize := Symbols.__Size
-
-		if !DllCall("Crypt32\CryptStringToBinary", "Str", CodeBase64, "UInt", 0, "UInt", 1
-			, "UPtr", 0, "UInt*", CompressedSize, "Ptr", 0, "Ptr", 0, "UInt")
-			throw Exception("Failed to parse MCLib b64 to binary")
-		
-		CompressedSize := VarSetCapacity(DecompressionBuffer, CompressedSize, 0)
-		pDecompressionBuffer := &DecompressionBuffer
-
-		if !DllCall("Crypt32\CryptStringToBinary", "Str", CodeBase64, "UInt", 0, "UInt", 1
-			, "Ptr", pDecompressionBuffer, "UInt*", CompressedSize, "Ptr", 0, "Ptr", 0, "UInt")
-			throw Exception("Failed to convert MCLib b64 to binary")
 		
 		if !(pBinary := DllCall("GlobalAlloc", "UInt", 0, "Ptr", DecompressedSize, "Ptr"))
 			throw Exception("Failed to reserve MCLib memory")
 
-		MClib.LZ.Decompress(pDecompressionBuffer, CompressedSize, pBinary, DecompressedSize)
+		Decoded := this.Base64.Decode(CodeBase64)
+		MClib.LZ.Decompress(Decoded.pData, Decoded.Size, pBinary, DecompressedSize)
 		
 		return MClib.Load(pBinary, DecompressedSize, Symbols, Relocations)
 	}
