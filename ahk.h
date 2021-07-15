@@ -1,4 +1,0 @@
-#ifndef MCLIB_INCLUDED
-#define MCLIB_INCLUDED
-
-#endif // MCLIB_INCLUDED
