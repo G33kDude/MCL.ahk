@@ -4,15 +4,18 @@
 C =
 ( %
 
-#define MCODE_LIBRARY
-#include "ahk.h"
+#include <mclib.h>
 
-MCODE_EXPORT_INLINE(int, Add, (int Left, int Right)) {
+MCLIB_EXPORT_INLINE(int, Add, (int Left, int Right)) {
     return Left + Right;
 }
 
-MCODE_EXPORT_INLINE(int, Multiply, (int Left, int Right)) {
+MCLIB_EXPORT_INLINE(int, Multiply, (int Left, int Right)) {
     return Left * Right;
+}
+
+int unused() {
+    return 20;
 }
 
 )

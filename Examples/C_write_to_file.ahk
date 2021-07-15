@@ -4,8 +4,7 @@
 C =
 ( %
 
-#define MCODE_FAKE_STDLIB
-#include "ahk.h"
+#include <stdio.h>
 
 void __main(int Value) {
 	FILE* f = fopen("test.txt", "w");

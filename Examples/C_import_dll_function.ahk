@@ -4,9 +4,10 @@
 C =
 ( %
 
-#include "ahk.h"
+#include <stdint.h>
+#include <mclib.h>
 
-MCODE_IMPORT(int, User32, MessageBoxA, (uint64_t, char*, char*, uint32_t))
+MCLIB_IMPORT(int, User32, MessageBoxA, (uint64_t, char*, char*, uint32_t))
 
 void __main() {
 	MessageBoxA(0, "Hello world from C!", "Wow", 0);

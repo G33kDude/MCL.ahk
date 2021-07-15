@@ -72,9 +72,10 @@ class MClib {
 	static CompilerSuffix := ".exe"
 
 	Compile(Compiler, Code, ExtraOptions := "") {
-		LinkerScript := MClib.GetTempPath(A_WorkingDir, "mclib-linker-", "")
-		InputFile    := MClib.GetTempPath(A_WorkingDir, "mclib-input-", ".c")
-		OutputFile   := MClib.GetTempPath(A_WorkingDir, "mclib-output-", ".bin")
+		LinkerScript  := MClib.GetTempPath(A_WorkingDir, "mclib-linker-", "")
+		IncludeFolder := MClib.GetTempPath(A_WorkingDir, "mclib-include-", "")
+		InputFile     := MClib.GetTempPath(A_WorkingDir, "mclib-input-", ".c")
+		OutputFile    := MClib.GetTempPath(A_WorkingDir, "mclib-output-", ".bin")
 
 		if (!FileExist("ahk.h")) {
 			FileCopy, %A_LineFile%/../ahk.h, ahk.h
@@ -89,9 +90,11 @@ class MClib {
 			while (!FileExist(InputFile)) {
 				Sleep, 100
 			}
+
+			FileCopyDir, %A_LineFile%/../include, % IncludeFolder
 			
 			shell := ComObjCreate("WScript.Shell")
-			exec := shell.Exec(MClib.CompilerPrefix Compiler MClib.CompilerSuffix " -m64 " InputFile " -o " OutputFile ExtraOptions " -ffreestanding -nostdlib -Wno-attribute-alias -T " LinkerScript " -Wl,--image-base -Wl,0x10000000 -Wl,-Ttext=0x5000 -Wl,--defsym -Wl,.text_offset=0x5000")
+			exec := shell.Exec(MClib.CompilerPrefix Compiler MClib.CompilerSuffix " -m64 " InputFile " -o " OutputFile ExtraOptions " -ffreestanding -nostdlib -Wno-attribute-alias -T " LinkerScript " -Wl,--image-base -Wl,0x10000000 -Wl,-Ttext=0x5000 -Wl,--defsym -Wl,.text_offset=0x5000 -I " IncludeFolder)
 			exec.StdIn.Close()
 			
 			if !exec.StdErr.AtEndOfStream
@@ -116,6 +119,8 @@ class MClib {
 			FileDelete, % InputFile
 			FileDelete, % LinkerScript
 			FileDelete, % OutputFile
+
+			FileRemoveDir, % IncludeFolder, 1
 
 			if (ShouldDeleteHeader) {
 				FileDelete, ahk.h
@@ -239,12 +244,12 @@ class MClib {
 				Base64 := SubStr(Base64, (120-8)+1)
 			}
 
-			return """V01;" SymbolsString ";" RelocationsString ";""" Out
+			return """V0.1;" SymbolsString ";" RelocationsString ";""" Out
 		}
 		else {
 			; Don't format the output, return the string that would result from AHK parsing the string literal returned when `FormatAsStringLiteral` is true
 
-			return "V01;" SymbolsString ";" RelocationsString ";" Base64
+			return "V0.1;" SymbolsString ";" RelocationsString ";" Base64
 		}
 	}
 	
@@ -262,7 +267,7 @@ class MClib {
 		Parts := StrSplit(Code, ";")
 		Version := Parts[1]
 
-		if (Formats.HasKey(Version) && Parts.Count() = Formats[Version] ) {
+		if (!Formats.HasKey(Version) || Parts.Count() != Formats[Version] ) {
 			Throw "Unknown/corrupt MClib packed code format"
 		}
 
@@ -276,13 +281,16 @@ class MClib {
 
 		Relocations := []
 
-		if (Version != "V0") {
+		if (Version = "V0") {
+			CodeBase64 := Parts[3]
+		}
+		else {
 			for k, Relocation in StrSplit(Parts[3], ",") {
 				Relocations.Push(Relocation)
 			}
-		}
 
-		CodeBase64 := Parts[3]
+			CodeBase64 := Parts[4]
+		}		
 
 		DecompressedSize := Symbols.__Size
 

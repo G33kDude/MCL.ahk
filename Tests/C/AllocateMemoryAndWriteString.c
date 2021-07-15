@@ -1,4 +1,4 @@
-#include "ahk.h"
+#include <stdlib.h>
 
 char* __main() {
     char* Memory = malloc(27);

@@ -4,7 +4,7 @@
 C =
 ( %
 
-#include "ahk.h"
+#include <stdlib.h>
 
 typedef struct {
 	int X;

@@ -49,8 +49,8 @@ class MCLibTests {
             Yunit.Assert(Abs(Result - 12.98) < 0.0001)
         }
 
-        ReturnSingleValueWithAHKHeader() {
-            pCode := MCLib.FromC(Read("ReturnSingleValueWithAHKHeader.c"))
+        ReturnSingleValueWithHeader() {
+            pCode := MCLib.FromC(Read("ReturnSingleValueWithHeader.c"))
 
             Result := DllCall(pCode, "Int")
             Yunit.Assert(Result == 2390)

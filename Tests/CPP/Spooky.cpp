@@ -1,5 +1,4 @@
-
-#include "ahk.h"
+#include <stdlib.h>
 #include "SpookyV2.cpp"
 
 class Random

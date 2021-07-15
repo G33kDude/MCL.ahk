@@ -1,4 +1,4 @@
-#include "ahk.h"
+#include <stdlib.h>
 
 class Point {
 public:
