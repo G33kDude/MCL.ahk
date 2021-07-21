@@ -1,13 +1,13 @@
 #ifndef STDLIB_HEADER
 #define STDLIB_HEADER
 
-#include "mclib.h"
+#include <mcl.h>
 #include <stddef.h>
 
-MCLIB_IMPORT(uint64_t, Kernel32, GetProcessHeap, ());
-MCLIB_IMPORT(void*, Kernel32, HeapAlloc, (uint64_t, uint32_t, size_t));
-MCLIB_IMPORT(void*, Kernel32, HeapReAlloc, (uint64_t, uint32_t, void*, size_t));
-MCLIB_IMPORT(void, Kernel32, HeapFree, (uint64_t, uint32_t, void*));
+MCL_IMPORT(uint64_t, Kernel32, GetProcessHeap, ());
+MCL_IMPORT(void*, Kernel32, HeapAlloc, (uint64_t, uint32_t, size_t));
+MCL_IMPORT(void*, Kernel32, HeapReAlloc, (uint64_t, uint32_t, void*, size_t));
+MCL_IMPORT(void, Kernel32, HeapFree, (uint64_t, uint32_t, void*));
 
 void* malloc(size_t Size) {
 	return HeapAlloc(GetProcessHeap(), 0x8, Size);

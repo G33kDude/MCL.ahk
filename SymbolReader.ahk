@@ -59,7 +59,7 @@ class PESymbolReader extends SymbolReaderBase {
 		static SIZEOF_SYMBOL := 18
 		
 		if (this.ReadUShort(0) != 0x8664) {
-			Throw "Not a valid 64 bit PE object file"
+			throw Exception("Not a valid 64 bit PE object file")
 		}
 		
 		SectionHeaderCount := this.ReadUShort(2)
@@ -126,7 +126,7 @@ class PESymbolReader extends SymbolReaderBase {
 						continue
 					}
 					else if (RelocationType != 10) {
-						throw "Unknown relocation type '" RelocationType "'"
+						throw Exception("Unknown relocation type '" RelocationType "'")
 					}
 
 					Relocations.Push(RelocationOffset)

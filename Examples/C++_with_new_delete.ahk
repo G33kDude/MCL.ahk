@@ -1,5 +1,5 @@
 #Include %A_ScriptDir%/../
-#include MCLib.ahk
+#include MCL.ahk
 
 CPP = 
 ( %
@@ -24,7 +24,7 @@ Point* __main(int X, int Y) {
 
 )
 
-pCode := MCLib.FromCPP(CPP)
+pCode := MCL.FromCPP(CPP)
 
 pPoint := DllCall(pCode, "Int", 20, "Int", 30, "Ptr")
 

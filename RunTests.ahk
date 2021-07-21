@@ -4,7 +4,7 @@
 #Include Yunit\Window.ahk
 #Include Yunit\Stdout.ahk
 
-#Include MCLib.ahk
+#Include MCL.ahk
 
 Tester := Yunit.Use(YunitStdout, YunitWindow)
 
@@ -12,28 +12,28 @@ Read(File) {
     return FileOpen(File, "r").Read()
 }
 
-class MCLibTests {
+class MCLTests {
     class C {
         Begin() {
             SetWorkingDir, %A_ScriptDir%/Tests/C
         }
 
         ReturnSingleValue() {
-            pCode := MCLib.FromC(Read("ReturnSingleValue.c"))
+            pCode := MCL.FromC(Read("ReturnSingleValue.c"))
 
             Result := DllCall(pCode, "Int")
             Yunit.Assert(Result == 2390)
         }
 
         ManualFunctionImport() {
-            pCode := MCLib.FromC(Read("ManualFunctionImport.c"))
+            pCode := MCL.FromC(Read("ManualFunctionImport.c"))
 
             Result := DllCall(pCode, "WStr", "2390", "Int")
             Yunit.Assert(Result == 2390)
         }
 
         PassLotsOfParameters() {
-            pCode := MCLib.FromC(Read("PassLotsOfParameters.c"))
+            pCode := MCL.FromC(Read("PassLotsOfParameters.c"))
 
             Result := DllCall(pCode, "Int", 2000, "Int", 150, "Int", 150, "Int", 60, "Int", 30, "Int")
             Yunit.Assert(Result == 2390)
@@ -43,21 +43,21 @@ class MCLibTests {
         }
 
         BasicFloatMath() {
-            pCode := MCLib.FromC(Read("BasicFloatMath.c"))
+            pCode := MCL.FromC(Read("BasicFloatMath.c"))
 
             Result := DllCall(pCode, "Double", 3.1, "Double", 2.8, "Double")
             Yunit.Assert(Abs(Result - 12.98) < 0.0001)
         }
 
         ReturnSingleValueWithHeader() {
-            pCode := MCLib.FromC(Read("ReturnSingleValueWithHeader.c"))
+            pCode := MCL.FromC(Read("ReturnSingleValueWithHeader.c"))
 
             Result := DllCall(pCode, "Int")
             Yunit.Assert(Result == 2390)
         }
 
         AllocateMemoryAndWriteString() {
-            pCode := MCLib.FromC(Read("AllocateMemoryAndWriteString.c"))
+            pCode := MCL.FromC(Read("AllocateMemoryAndWriteString.c"))
 
             pResult := DllCall(pCode, "Ptr")
 
@@ -65,7 +65,7 @@ class MCLibTests {
         }
 
         Library() {
-            Library := MCLib.FromC(Read("Library.c"))
+            Library := MCL.FromC(Read("Library.c"))
 
             Yunit.Assert(IsObject(Library))
 
@@ -81,7 +81,7 @@ class MCLibTests {
         }
 
         Relocations() {
-            pCode := MCLib.FromC(Read("Relocations.c"))
+            pCode := MCL.FromC(Read("Relocations.c"))
 
             for k, String in ["Hello", "Goodbye", "dog", "cat"] {
                 pEntry := DllCall(pCode, "Int", k - 1, "Ptr")
@@ -99,7 +99,7 @@ class MCLibTests {
         }
 
         New() {
-            pCode := MCLib.FromCPP(Read("New.cpp"))
+            pCode := MCL.FromCPP(Read("New.cpp"))
 
             pPoint := DllCall(pCode, "Int", 20, "Int", 30, "Ptr")
 
@@ -108,7 +108,7 @@ class MCLibTests {
         }
 
         Spooky() {
-            pCode := MCLib.FromCPP(Read("Spooky.cpp"))
+            pCode := MCL.FromCPP(Read("Spooky.cpp"))
 
             Success := DllCall(pCode)
 
@@ -121,4 +121,4 @@ class MCLibTests {
     }
 }
 
-Tester.Test(MCLibTests)
+Tester.Test(MCLTests)

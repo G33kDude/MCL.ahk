@@ -1,5 +1,5 @@
 #Include %A_ScriptDir%/../
-#include MCLib.ahk
+#include MCL.ahk
 
 C =
 ( %
@@ -16,7 +16,7 @@ int __main(int NewValue) {
 
 )
 
-pCode := MCLib.FromC(C)
+pCode := MCL.FromC(C)
 
 MsgBox, % DllCall(pCode, "Int", 20, "Ptr")
 MsgBox, % DllCall(pCode, "Int", 30, "Ptr")

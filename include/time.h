@@ -1,12 +1,12 @@
 #ifndef TIME_HEADER
 #define TIME_HEADER
 
-#include "mclib.h"
+#include <mcl.h>
 #include "stdlib.h"
 
 typedef uint64_t time_t;
 
-MCLIB_IMPORT(time_t, msvcrt, time, (time_t*));
+MCL_IMPORT(time_t, msvcrt, time, (time_t*));
 
 struct tm {
    int tm_sec;         /* seconds,  range 0 to 59          */
@@ -20,7 +20,7 @@ struct tm {
    int tm_isdst;       /* daylight saving time             */	
 };
 
-MCLIB_IMPORT(int, msvcrt, _localtime32_s, (struct tm*, const time_t*));
+MCL_IMPORT(int, msvcrt, _localtime32_s, (struct tm*, const time_t*));
 
 struct tm* localtime_r(const time_t* Time, struct tm* Output) {
 	_localtime32_s(Output, Time);
@@ -34,6 +34,6 @@ struct tm* localtime(const time_t* Time) {
 	return localtime_r(Time, Result);
 }
 
-MCLIB_IMPORT(size_t, msvcrt, strftime, (char*, size_t, const char*, const struct tm*));
+MCL_IMPORT(size_t, msvcrt, strftime, (char*, size_t, const char*, const struct tm*));
 
 #endif // TIME_HEADER

@@ -1,5 +1,5 @@
 #Include %A_ScriptDir%/../
-#include MCLib.ahk
+#include MCL.ahk
 
 C =
 ( %
@@ -22,9 +22,9 @@ Point* __main(int a, int b) {
 
 )
 
-Code := MCLib.AHKFromC(C, false) ; Compile and stringify the code, but don't format it as an AHK string literal (since we're going to load it again momentarily)
+Code := MCL.AHKFromC(C, false) ; Compile and stringify the code, but don't format it as an AHK string literal (since we're going to load it again momentarily)
 
-pCode := MCLib.FromString(Code)
+pCode := MCL.FromString(Code)
 
 pPoint := DllCall(pCode, "Int", 20, "Int", 30, "Ptr")
 

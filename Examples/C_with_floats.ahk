@@ -1,5 +1,5 @@
 #Include %A_ScriptDir%/../
-#include MCLib.ahk
+#include MCL.ahk
 
 C =
 ( %
@@ -10,6 +10,6 @@ double __main(double In) {
 
 )
 
-pCode := MCLib.FromC(C)
+pCode := MCL.FromC(C)
 
 MsgBox, % DllCall(pCode, "Double", 11.7, "Double")

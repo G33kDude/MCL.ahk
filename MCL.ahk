@@ -1,6 +1,6 @@
 ﻿#Include %A_LineFile%\..\SymbolReader.ahk
 
-class MClib {
+class MCL {
 	class LZ {
 		Compress(pData, cbData, pCData, cbCData) {
 			if (r := DllCall("ntdll\RtlGetCompressionWorkSpaceSize"
@@ -67,7 +67,7 @@ class MClib {
 			return Base64
 		}
 
-		Decode(Base64) {
+		Decode(Base64, ByRef DecodeBuffer) {
 			if !DllCall("Crypt32\CryptStringToBinary", "Str", Base64, "UInt", 0, "UInt", 1
 				, "UPtr", 0, "UInt*", DecodedSize, "Ptr", 0, "Ptr", 0, "UInt")
 				throw Exception("Failed to parse b64 to binary")
@@ -79,7 +79,7 @@ class MClib {
 				, "Ptr", pDecodeBuffer, "UInt*", DecodedSize, "Ptr", 0, "Ptr", 0, "UInt")
 				throw Exception("Failed to convert b64 to binary")
 
-			return {"pData": pDecodeBuffer, "Size": Size}
+			return DecodedSize
 		}
 	}
 
@@ -99,7 +99,7 @@ class MClib {
 		Result := {}
 
 		for SymbolName, Symbol in Symbols {
-			if (SymbolName = "__main" || RegExMatch(SymbolName, "O)__MCLIB_(e|i)_(\w+)")) {
+			if (SymbolName = "__main" || RegExMatch(SymbolName, "O)__MCL_(e|i)_(\w+)")) {
 				Result[SymbolName] := Symbol.Value
 			}
 		}
@@ -107,14 +107,14 @@ class MClib {
 		return Result
 	}
 
-	static CompilerPrefix := "x86_64-w64-mingw32-"
+	static CompilerPrefix := ""
 	static CompilerSuffix := ".exe"
 
 	Compile(Compiler, Code, ExtraOptions := "") {
-		LinkerScript  := this.GetTempPath(A_WorkingDir, "mclib-linker-", "")
-		IncludeFolder := this.GetTempPath(A_WorkingDir, "mclib-include-", "")
-		InputFile     := this.GetTempPath(A_WorkingDir, "mclib-input-", ".c")
-		OutputFile    := this.GetTempPath(A_WorkingDir, "mclib-output-", ".bin")
+		LinkerScript  := this.GetTempPath(A_WorkingDir, "mcl-linker-", "")
+		IncludeFolder := this.GetTempPath(A_WorkingDir, "mcl-include-", "")
+		InputFile     := this.GetTempPath(A_WorkingDir, "mcl-input-", ".c")
+		OutputFile    := this.GetTempPath(A_WorkingDir, "mcl-output-", ".bin")
 
 		try {
 			FileOpen(LinkerScript, "w").Write("OUTPUT_FORMAT(pe-x86-64)SECTIONS{.text :{*(.text*)*(.rodata*)*(.rdata*)*(.data*)*(.bss*)}}")
@@ -144,7 +144,7 @@ class MClib {
 			Size := F.Length
 			
 			if !(pPE := DllCall("GlobalAlloc", "UInt", 0, "Ptr", Size, "Ptr"))
-				Throw Exception("Failed to reserve MCLib PE memory")
+				Throw Exception("Failed to reserve MCL PE memory")
 			
 			F.RawRead(pPE + 0, Size)
 			F.Close()
@@ -167,20 +167,20 @@ class MClib {
 	
 	Load(pCode, CodeSize, Symbols, Relocations) {
 		for SymbolName, SymbolOffset in Symbols {
-			if (RegExMatch(SymbolName, "O)__MCLIB_i_(\w+?)_(\w+)", Match)) {
+			if (RegExMatch(SymbolName, "O)__MCL_i_(\w+?)_(\w+)", Match)) {
 				DllName := Match[1]
 				FunctionName := Match[2]
 
 				hDll := DllCall("GetModuleHandle", "Str", DllName, "Ptr")
 
 				if (ErrorLevel || A_LastError) {
-					Throw "Could not load dll " DllName ", ErrorLevel " ErrorLevel ", LastError " Format("{:0x}", A_LastError) 
+					Throw Exception("Could not load dll " DllName ", ErrorLevel " ErrorLevel ", LastError " Format("{:0x}", A_LastError))
 				}
 
 				pFunction := DllCall("GetProcAddress", "Ptr", hDll, "AStr", FunctionName, "Ptr")
 
 				if (ErrorLevel || A_LastError) {
-					Throw "Could not find function " FunctionName " from " DllName ".dll, ErrorLevel " ErrorLevel ", LastError " Format("{:0x}", A_LastError) 
+					Throw Exception("Could not find function " FunctionName " from " DllName ".dll, ErrorLevel " ErrorLevel ", LastError " Format("{:0x}", A_LastError))
 				}
 
 				NumPut(pFunction, pCode + 0, SymbolOffset, "Ptr")
@@ -193,12 +193,12 @@ class MClib {
 		}
 		
 		if !DllCall("VirtualProtect", "Ptr", pCode, "Ptr", CodeSize, "UInt", 0x40, "UInt*", OldProtect, "UInt")
-			Throw Exception("Failed to mark MCLib memory as executable")
+			Throw Exception("Failed to mark MCL memory as executable")
 		
 		Exports := {}
 
 		for SymbolName, SymbolOffset in Symbols {
-			if (RegExMatch(SymbolName, "O)__MCLIB_e_(\w+)", Match)) {
+			if (RegExMatch(SymbolName, "O)__MCL_e_(\w+)", Match)) {
 				Exports[Match[1]] := pCode + SymbolOffset
 			}
 		}
@@ -305,10 +305,10 @@ class MClib {
 		Exports := {}
 
 		for SymbolName, SymbolOffset in Symbols {
-			if (RegExMatch(SymbolName, "O)__MCLIB_i_(\w+)_(\w+)", Match)) {
+			if (RegExMatch(SymbolName, "O)__MCL_i_(\w+)_(\w+)", Match)) {
 				Imports[Match[1] "_" Match[2]] := SymbolOffset
 			}
-			else if (RegExMatch(SymbolName, "O)__MCLIB_e_(\w+)", Match)) {
+			else if (RegExMatch(SymbolName, "O)__MCL_e_(\w+)", Match)) {
 				Exports[Match[1]] := SymbolOffset
 			}
 		}
@@ -338,14 +338,14 @@ class MClib {
 	AHKFromC(Code, FormatAsStringLiteral := true) {
 		return this.Pack(FormatAsStringLiteral, this.Compile("gcc", Code)*)
 	}
-	StandaloneAHKFromC(Code, Name := "MyMCLibC") {
+	StandaloneAHKFromC(Code, Name := "MyMCLC") {
 		return this.StandalonePack(Name, this.Compile("gcc", Code)*)
 	}
 	
 	AHKFromCPP(Code, FormatAsStringLiteral := true) {
 		return this.Pack(FormatAsStringLiteral, this.Compile("g++", "extern ""C"" {`n" Code "`n}", " -fno-exceptions -fno-rtti")*)
 	}
-	StandaloneAHKFromCPP(Code, Name := "MyMCLibCPP") {
+	StandaloneAHKFromCPP(Code, Name := "MyMCLCPP") {
 		return this.StandalonePack(Name, this.Compile("g++", "extern ""C"" {`n" Code "`n}", " -fno-exceptions -fno-rtti")*)
 	}
 
@@ -357,7 +357,7 @@ class MClib {
 		Version := Parts[1]
 
 		if (!Formats.HasKey(Version) || Parts.Count() != Formats[Version] ) {
-			Throw "Unknown/corrupt MClib packed code format"
+			Throw "Unknown/corrupt MCL packed code format"
 		}
 
 		Symbols := {}
@@ -365,7 +365,7 @@ class MClib {
 		for k, SymbolEntry in StrSplit(Parts[2], ",") {
 			SymbolEntry := StrSplit(SymbolEntry, ":")
 
-			Symbols[SymbolEntry[1]] := SymbolEntry[2]
+			Symbols[SymbolEntry[1]] := SymbolEntry[2] + 0
 		}
 
 		Relocations := []
@@ -375,7 +375,7 @@ class MClib {
 		}
 		else {
 			for k, Relocation in StrSplit(Parts[3], ",") {
-				Relocations.Push(Relocation)
+				Relocations.Push(Relocation + 0)
 			}
 
 			CodeBase64 := Parts[4]
@@ -384,10 +384,10 @@ class MClib {
 		DecompressedSize := Symbols.__Size
 		
 		if !(pBinary := DllCall("GlobalAlloc", "UInt", 0, "Ptr", DecompressedSize, "Ptr"))
-			throw Exception("Failed to reserve MCLib memory")
+			throw Exception("Failed to reserve MCL memory")
 
-		Decoded := this.Base64.Decode(CodeBase64)
-		this.LZ.Decompress(Decoded.pData, Decoded.Size, pBinary, DecompressedSize)
+		DecodedSize := this.Base64.Decode(CodeBase64, Data)
+		this.LZ.Decompress(&Data, DecodedSize, pBinary, DecompressedSize)
 		
 		return this.Load(pBinary, DecompressedSize, Symbols, Relocations)
 	}

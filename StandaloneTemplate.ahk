@@ -1,7 +1,6 @@
 ﻿
 $Name() {
 	static CodeBase64 := $CodeBase64
-	static CodeSize := $CodeSize
 	static Code := false
 
 	if (!Code) {
@@ -13,10 +12,10 @@ $Name() {
 		if !DllCall("Crypt32\CryptStringToBinary", "Str", CodeBase64, "UInt", 0, "UInt", 1, "Ptr", &DecompressionBuffer, "UInt*", CompressedSize, "Ptr", 0, "Ptr", 0, "UInt")
 			throw Exception("Failed to convert MCLib b64 to binary")
 		
-		if !(pCode := DllCall("GlobalAlloc", "UInt", 0, "Ptr", CodeSize, "Ptr"))
+		if !(pCode := DllCall("GlobalAlloc", "UInt", 0, "Ptr", $CodeSize, "Ptr"))
 			throw Exception("Failed to reserve MCLib memory")
 
-		if (DllCall("ntdll\RtlDecompressBuffer", "UShort", 0x102, "Ptr", pCode, "UInt", CodeSize, "Ptr", &DecompressionBuffer, "UInt", CompressedSize, "UInt*", DecompressedSize, "UInt"))
+		if (DllCall("ntdll\RtlDecompressBuffer", "UShort", 0x102, "Ptr", pCode, "UInt", $CodeSize, "Ptr", &DecompressionBuffer, "UInt", CompressedSize, "UInt*", DecompressedSize, "UInt"))
 			throw Exception("Error calling RtlDecompressBuffer",, Format("0x{:08x}", r))
 	
 $HasImports
@@ -44,7 +43,7 @@ $HasRelocations
 		}
 $HasRelocations
 		
-		if !DllCall("VirtualProtect", "Ptr", pCode, "Ptr", CodeSize, "UInt", 0x40, "UInt*", OldProtect, "UInt")
+		if !DllCall("VirtualProtect", "Ptr", pCode, "Ptr", $CodeSize, "UInt", 0x40, "UInt*", OldProtect, "UInt")
 			Throw Exception("Failed to mark MCLib memory as executable")
 
 $HasExports

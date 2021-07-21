@@ -1,16 +1,16 @@
 #Include %A_ScriptDir%/../
-#include MCLib.ahk
+#include MCL.ahk
 
 C =
 ( %
 
-#include <mclib.h>
+#include <MCL.h>
 
-MCLIB_EXPORT_INLINE(int, Add, (int Left, int Right)) {
+MCL_EXPORT_INLINE(int, Add, (int Left, int Right)) {
     return Left + Right;
 }
 
-MCLIB_EXPORT_INLINE(int, Multiply, (int Left, int Right)) {
+MCL_EXPORT_INLINE(int, Multiply, (int Left, int Right)) {
     return Left * Right;
 }
 
@@ -20,7 +20,7 @@ int unused() {
 
 )
 
-Code := MCLib.FromC(C)
+Code := MCL.FromC(C)
 
 Added := DllCall(Code.Add, "Int", 300, "Int", -20, "Int")
 MsgBox, % Added

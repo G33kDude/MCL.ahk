@@ -1,21 +1,21 @@
 #ifndef STDIO_HEADER
 #define STDIO_HEADER
 
-#include <mclib.h>
+#include <mcl.h>
 #include <stddef.h>
 
 typedef struct {
 	char Dummy;
 } FILE;
 
-MCLIB_IMPORT(FILE*, msvcrt, fopen, (const char*, const char*));
-MCLIB_IMPORT(long int, msvcrt, ftell, (FILE*));
-MCLIB_IMPORT(int, msvcrt, fseek, (FILE*, long int, int));
-MCLIB_IMPORT(size_t, msvcrt, fwrite, (const void*, size_t, size_t, FILE*));
-MCLIB_IMPORT(int, msvcrt, fputs, (char*, FILE*));
-MCLIB_IMPORT(size_t, msvcrt, fread, (void*, size_t, size_t, FILE*));
-MCLIB_IMPORT(int, msvcrt, fprintf, (FILE*, char*, ...));
-MCLIB_IMPORT(int, msvcrt, fclose, (FILE*));
+MCL_IMPORT(FILE*, msvcrt, fopen, (const char*, const char*));
+MCL_IMPORT(long int, msvcrt, ftell, (FILE*));
+MCL_IMPORT(int, msvcrt, fseek, (FILE*, long int, int));
+MCL_IMPORT(size_t, msvcrt, fwrite, (const void*, size_t, size_t, FILE*));
+MCL_IMPORT(int, msvcrt, fputs, (char*, FILE*));
+MCL_IMPORT(size_t, msvcrt, fread, (void*, size_t, size_t, FILE*));
+MCL_IMPORT(int, msvcrt, fprintf, (FILE*, char*, ...));
+MCL_IMPORT(int, msvcrt, fclose, (FILE*));
 
 #define SEEK_SET 0
 #define SEEK_CUR 1
