@@ -29,9 +29,9 @@ struct stat {
 	off_t st_size;
 };
 
-#define fileno(f) ((uint32_t)f)
+#define fileno(f) ((uint_t)f)
 
-int fstat(uint32_t FileHandle, struct stat* Output) {
+int fstat(uint_t FileHandle, struct stat* Output) {
 	FILE* f = (FILE*)FileHandle;
 
 	int OldPosition = ftell(f);
