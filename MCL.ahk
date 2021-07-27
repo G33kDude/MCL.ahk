@@ -1,4 +1,4 @@
-﻿#Include %A_LineFile%\..\SymbolReader.ahk
+﻿#Include %A_LineFile%\..\Linker.ahk
 
 class MCL {
 	class LZ {
@@ -111,14 +111,11 @@ class MCL {
 	static CompilerSuffix := ".exe"
 
 	Compile(Compiler, Code, ExtraOptions := "") {
-		LinkerScript  := this.GetTempPath(A_WorkingDir, "mcl-linker-", "")
 		IncludeFolder := this.GetTempPath(A_WorkingDir, "mcl-include-", "")
 		InputFile     := this.GetTempPath(A_WorkingDir, "mcl-input-", ".c")
-		OutputFile    := this.GetTempPath(A_WorkingDir, "mcl-output-", ".bin")
+		OutputFile    := this.GetTempPath(A_WorkingDir, "mcl-output-", ".o")
 
 		try {
-			FileOpen(LinkerScript, "w").Write("OUTPUT_FORMAT(pe-x86-64)SECTIONS{.text :{*(.text*)*(.rodata*)*(.rdata*)*(.data*)*(.bss*)}}")
-
 			FileOpen(InputFile, "w").Write(code)
 			
 			while (!FileExist(InputFile)) {
@@ -128,7 +125,7 @@ class MCL {
 			FileCopyDir, %A_LineFile%/../include, % IncludeFolder
 			
 			shell := ComObjCreate("WScript.Shell")
-			exec := shell.Exec(this.CompilerPrefix Compiler this.CompilerSuffix " -m64 " InputFile " -o " OutputFile ExtraOptions " -ffreestanding -nostdlib -Wno-attribute-alias -T " LinkerScript " -Wl,--image-base -Wl,0x10000000 -Wl,-Ttext=0x5000 -Wl,--defsym -Wl,.text_offset=0x5000 -I " IncludeFolder)
+			exec := shell.Exec(this.CompilerPrefix Compiler this.CompilerSuffix " -m64 " InputFile " -o " OutputFile " -I " IncludeFolder ExtraOptions " -ffreestanding -nostdlib -Wno-attribute-alias -c")
 			exec.StdIn.Close()
 			
 			if !exec.StdErr.AtEndOfStream
@@ -151,18 +148,55 @@ class MCL {
 		}
 		finally {
 			FileDelete, % InputFile
-			FileDelete, % LinkerScript
 			FileDelete, % OutputFile
 
 			FileRemoveDir, % IncludeFolder, 1
 		}
 		
-		Reader := new PESymbolReader(pPE, Size)
-		Output := Reader.Read()
-		
-		pCode := pPE + Output.SectionsByName[".text"].FileOffset
+		Linker := new PEObjectLinker(pPE, Size)
+		Linker.Read()
 
-		return [pCode, Output.SectionsByName[".text"].FileSize, this.NormalizeSymbols(Output.AbsoluteSymbols), Output.Relocations]
+		TextSection := Linker.SectionsByName[".text"]
+
+		Linker.MakeSectionStandalone(TextSection)
+		Linker.DoStaticRelocations(TextSection)
+
+		Symbols := {}
+
+		for SymbolName, Symbol in TextSection.SymbolsByName {
+			if (SymbolName = "__main" || RegExMatch(SymbolName, "O)__MCL_(e|i)_(\w+)")) {
+				Symbols[SymbolName] := Symbol.Value
+			}
+		}
+
+		Relocations := []
+
+		for k, Relocation in TextSection.Relocations {
+			if (Relocation.Symbol.Section.Name != ".text") {
+				continue
+			}
+
+			if (Relocation.Type = 0x1) {
+				Offset := TextSection.Data.Read(Relocation.Address, "Int64")
+				Address := Relocation.Symbol.Value + Offset
+				TextSection.Data.Write(Address, Relocation.Address, "Int64")
+
+				Relocations.Push(Relocation.Address)
+			}
+		}
+
+		CodeSize := TextSection.Data.Length()
+
+		if !(pCode := DllCall("GlobalAlloc", "UInt", 0, "Ptr", CodeSize, "Ptr"))
+			Throw Exception("Failed to reserve MCL PE memory")
+		
+		TextSection.Data.Coalesce(pCode)
+
+		;F := FileOpen("out.bin", "w")
+		;F.RawWrite(pCode + 0, CodeSize)
+		;F.Close()
+
+		return [pCode, CodeSize, Symbols, Relocations]
 	}
 	
 	Load(pCode, CodeSize, Symbols, Relocations) {
@@ -171,12 +205,14 @@ class MCL {
 				DllName := Match[1]
 				FunctionName := Match[2]
 
+				DllCall("SetLastError", "Int", 0)
 				hDll := DllCall("GetModuleHandle", "Str", DllName, "Ptr")
 
 				if (ErrorLevel || A_LastError) {
 					Throw Exception("Could not load dll " DllName ", ErrorLevel " ErrorLevel ", LastError " Format("{:0x}", A_LastError))
 				}
 
+				DllCall("SetLastError", "Int", 0)
 				pFunction := DllCall("GetProcAddress", "Ptr", hDll, "AStr", FunctionName, "Ptr")
 
 				if (ErrorLevel || A_LastError) {

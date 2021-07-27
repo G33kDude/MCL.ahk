@@ -88,7 +88,7 @@ class MCLTests {
 
                 pString := NumGet(pEntry + 0, 0, "Ptr")
 
-                Yunit.Asser(StrGet(pString, "UTF-8") = String)
+                Yunit.Assert(StrGet(pString, "UTF-8") = String)
             }
         }
     }
