@@ -125,7 +125,7 @@ class MCL {
 			FileCopyDir, %A_LineFile%/../include, % IncludeFolder
 			
 			shell := ComObjCreate("WScript.Shell")
-			exec := shell.Exec(this.CompilerPrefix Compiler this.CompilerSuffix " -m64 " InputFile " -o " OutputFile " -I " IncludeFolder ExtraOptions " -ffreestanding -nostdlib -Wno-attribute-alias -c")
+			exec := shell.Exec(this.CompilerPrefix Compiler this.CompilerSuffix " -m64 " InputFile " -o " OutputFile " -I " IncludeFolder ExtraOptions " -ffreestanding -nostdlib -Wno-attribute-alias -c --function-sections --data-sections")
 			exec.StdIn.Close()
 			
 			if !exec.StdErr.AtEndOfStream
@@ -158,13 +158,19 @@ class MCL {
 
 		TextSection := Linker.SectionsByName[".text"]
 
+		for SymbolName, Symbol in Linker.SymbolsByName {
+			if (SymbolName = "__main" || RegExMatch(SymbolName, "O)^__MCL_e_(\w+)")) {
+				Linker.MergeSections(TextSection, Symbol.Section)
+			}
+		}
+
 		Linker.MakeSectionStandalone(TextSection)
 		Linker.DoStaticRelocations(TextSection)
 
 		Symbols := {}
 
 		for SymbolName, Symbol in TextSection.SymbolsByName {
-			if (SymbolName = "__main" || RegExMatch(SymbolName, "O)__MCL_(e|i)_(\w+)")) {
+			if (SymbolName = "__main" || RegExMatch(SymbolName, "O)^__MCL_(e|i)_(\w+)")) {
 				Symbols[SymbolName] := Symbol.Value
 			}
 		}

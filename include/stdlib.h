@@ -27,36 +27,10 @@ void free(void* Memory) {
 	HeapFree(GetProcessHeap(), 0, Memory);
 }
 
-void* memcpy(void* To, const void* From, size_t Count) {
-	asm("cld\n\t" \
-		"rep movsb" \
-		:: "D"(To), "S"(From), "c"(Count)
-	);
 
-	return To;
-}
-
-void* memset(void* To, int Value, size_t Count) {
-	asm("cld\n\t" \
-		"rep stosb" \
-		:: "D"(To), "c"(Count), "a"(Value)
-	);
-	
-	return To;
-}
-
-int memcmp(const void* Left, const void* Right, size_t Count) {
-	asm("cld\n\t" \
-		"repe cmpsb\n\t" \
-        "mov 0, %%eax\n\t" \
-        "cmovl -1, %%eax\n\t" \
-        "cmovg 1, %%eax\n\t" \
-        "ret"
-		:: "D"(Left), "S"(Right), "c"(Count)
-	);
-
-    return 0;
-}
+MCL_IMPORT(void*, msvcrt, memcpy, (void*, const void*, size_t));
+MCL_IMPORT(void*, msvcrt, memset, (void*, int, size_t));
+MCL_IMPORT(int, msvcrt, memcmp, (const void*, const void*, size_t));
 
 #ifdef __cplusplus
 void* operator new(size_t size) {

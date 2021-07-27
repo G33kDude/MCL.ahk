@@ -101,11 +101,11 @@ class PEObjectLinker extends LinkerBase {
 
 		Result := {}
 		
-		Result.Name			  := this.ReadString(HeaderOffset, 8)
-		Result.VirtualSize	   :=   this.ReadUInt(HeaderOffset + 8)
-		Result.VirtualAddress	:=   this.ReadUInt(HeaderOffset + 12)
-		Result.FileSize		  :=   this.ReadUInt(HeaderOffset + 16)
-		Result.FileOffset		:=   this.ReadUInt(HeaderOffset + 20)
+		Result.Name              := this.ReadString(HeaderOffset, 8)
+		Result.VirtualSize       :=   this.ReadUInt(HeaderOffset + 8)
+		Result.VirtualAddress    :=   this.ReadUInt(HeaderOffset + 12)
+		Result.FileSize          :=   this.ReadUInt(HeaderOffset + 16)
+		Result.FileOffset        :=   this.ReadUInt(HeaderOffset + 20)
 		Result.RelocationsOffset :=   this.ReadUInt(HeaderOffset + 24)
 		Result.RelocationCount   :=   this.ReadUInt(HeaderOffset + 32)
 		Result.Characteristics   :=   this.ReadUInt(HeaderOffset + 36)
@@ -132,8 +132,8 @@ class PEObjectLinker extends LinkerBase {
 			;  whenever we need.
 
 			RelocationAddress :=   this.ReadUInt(NextRelocationOffset)
-			SymbolIndex	   :=   this.ReadUInt(NextRelocationOffset + 4)
-			RelocationType	:= this.ReadUShort(NextRelocationOffset + 8)
+			SymbolIndex       :=   this.ReadUInt(NextRelocationOffset + 4)
+			RelocationType    := this.ReadUShort(NextRelocationOffset + 8)
 			
 			NextRelocationOffset += 10
 
@@ -209,6 +209,8 @@ class PEObjectLinker extends LinkerBase {
 				
 				Target.Relocations.Push(Relocation)
 			}
+
+			Target.RelocationCount += Section.RelocationCount
 			
 			this.SectionsByName.Delete(Name) ; Remove the merged section from the file's list of sections,
 			; since it effectively no longer exists
