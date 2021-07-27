@@ -7,7 +7,7 @@ C =
 #include <stdint.h>
 #include <mcl.h>
 
-MCL_IMPORT(int, User32, MessageBoxA, (uint64_t, char*, char*, uint32_t))
+MCL_IMPORT(int, User32, MessageBoxA, (uint32_t, char*, char*, uint32_t));
 
 int __main() {
 	MessageBoxA(0, "Hello world from C!", "Wow", 0);

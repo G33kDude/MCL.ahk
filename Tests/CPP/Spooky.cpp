@@ -1,4 +1,7 @@
 #include <stdlib.h>
+
+#if MCL_BITNESS == 64
+
 #include "SpookyV2.cpp"
 
 class Random
@@ -125,3 +128,11 @@ int __main()
 
     return -1;
 }
+#else // MCL_BITNESS == 64
+// SpookyHash doesn't support 32 bit
+
+int __main() {
+    return -1;
+}
+
+#endif

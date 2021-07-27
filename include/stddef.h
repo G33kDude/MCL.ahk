@@ -3,11 +3,19 @@
 
 #include <stdint.h>
 
+#if MCL_BITNESS == 64
 typedef uint64_t size_t;
 typedef int64_t ssize_t;
 
 typedef int64_t ptrdiff_t;
 typedef uint64_t off_t;
+#else
+typedef uint32_t size_t;
+typedef int32_t ssize_t;
+
+typedef int32_t ptrdiff_t;
+typedef uint32_t off_t;
+#endif
 
 #ifndef __cplusplus
 typedef uint16_t wchar_t;

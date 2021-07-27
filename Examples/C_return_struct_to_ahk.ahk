@@ -26,6 +26,6 @@ Code := MCL.AHKFromC(C, false) ; Compile and stringify the code, but don't forma
 
 pCode := MCL.FromString(Code)
 
-pPoint := DllCall(pCode, "Int", 20, "Int", 30, "Ptr")
+pPoint := DllCall(pCode, "Int", 20, "Int", 30, "CDecl Ptr")
 
 MsgBox, % NumGet(pPoint+0, 0, "Int") ", " NumGet(pPoint+0, 4, "Int")

@@ -95,20 +95,9 @@ class MCL {
 		return prefix counter ext
 	}
 
-	NormalizeSymbols(Symbols) {
-		Result := {}
-
-		for SymbolName, Symbol in Symbols {
-			if (SymbolName = "__main" || RegExMatch(SymbolName, "O)__MCL_(e|i)_(\w+)")) {
-				Result[SymbolName] := Symbol.Value
-			}
-		}
-
-		return Result
-	}
-
 	static CompilerPrefix := ""
 	static CompilerSuffix := ".exe"
+	static Bitness        := A_PtrSize * 8
 
 	Compile(Compiler, Code, ExtraOptions := "") {
 		IncludeFolder := this.GetTempPath(A_WorkingDir, "mcl-include-", "")
@@ -125,7 +114,7 @@ class MCL {
 			FileCopyDir, %A_LineFile%/../include, % IncludeFolder
 			
 			shell := ComObjCreate("WScript.Shell")
-			exec := shell.Exec(this.CompilerPrefix Compiler this.CompilerSuffix " -m64 " InputFile " -o " OutputFile " -I " IncludeFolder ExtraOptions " -ffreestanding -nostdlib -Wno-attribute-alias -c --function-sections --data-sections")
+			exec := shell.Exec(this.CompilerPrefix Compiler this.CompilerSuffix " -m" this.Bitness " " InputFile " -o " OutputFile " -I " IncludeFolder " -D MCL_BITNESS=" this.Bitness ExtraOptions " -ffreestanding -nostdlib -Wno-attribute-alias -fno-leading-underscore --function-sections --data-sections -c")
 			exec.StdIn.Close()
 			
 			if !exec.StdErr.AtEndOfStream
@@ -175,17 +164,21 @@ class MCL {
 			}
 		}
 
+		static IMAGE_REL_I386_DIR32   := 0x6
+		static IMAGE_REL_AMD64_ADDR64 := 0x1
+
 		Relocations := []
+		RelocationDataType := Linker.Is32Bit ? "Int" : "Int64"
 
 		for k, Relocation in TextSection.Relocations {
 			if (Relocation.Symbol.Section.Name != ".text") {
 				continue
 			}
 
-			if (Relocation.Type = 0x1) {
-				Offset := TextSection.Data.Read(Relocation.Address, "Int64")
+			if (Relocation.Type = IMAGE_REL_I386_DIR32 || Relocation.Type = IMAGE_REL_AMD64_ADDR64) {
+				Offset := TextSection.Data.Read(Relocation.Address, RelocationDataType)
 				Address := Relocation.Symbol.Value + Offset
-				TextSection.Data.Write(Address, Relocation.Address, "Int64")
+				TextSection.Data.Write(Address, Relocation.Address, RelocationDataType)
 
 				Relocations.Push(Relocation.Address)
 			}

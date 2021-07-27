@@ -110,6 +110,12 @@ class PEObjectLinker extends LinkerBase {
 		Result.RelocationCount   :=   this.ReadUInt(HeaderOffset + 32)
 		Result.Characteristics   :=   this.ReadUInt(HeaderOffset + 36)
 
+		if (SubStr(Result.Name, 1, 1) = "/") {
+			NameOffset := SubStr(Result.Name, 2) + 0
+
+			Result.Name := this.ReadString(this.StringTableOffset + NameOffset)
+		}
+
 		InitialData := this.pData + Result.FileOffset
 
 		if (Result.FileOffset = 0) {
@@ -161,14 +167,14 @@ class PEObjectLinker extends LinkerBase {
 		return Result
 	}
 
-	ReadSymbolHeader(SymbolNamesOffset, HeaderOffset) {
+	ReadSymbolHeader(HeaderOffset) {
 		Result := {}
 		
 		if (this.ReadUInt(HeaderOffset) != 0) {
 			Result.Name := this.ReadString(HeaderOffset, 8)
 		}
 		else {
-			Result.Name := this.ReadString(SymbolNamesOffset + this.ReadUInt(HeaderOffset + 4))
+			Result.Name := this.ReadString(this.StringTableOffset + this.ReadUInt(HeaderOffset + 4))
 		}
 		
 		Result.Value		  :=   this.ReadUInt(HeaderOffset + 8)
@@ -223,14 +229,19 @@ class PEObjectLinker extends LinkerBase {
 		static SIZEOF_COFF_HEADER := 20
 		static SIZEOF_SECTION_HEADER := 40
 		static SIZEOF_SYMBOL := 18
+
+		Magic := this.ReadUShort(0)
+		this.Is32Bit := Magic = 0x14c
+		this.Is64Bit := Magic = 0x8664
 		
-		if (this.ReadUShort(0) != 0x8664) {
-			throw Exception("Not a valid 64 bit PE object file")
+		if (this.Is32Bit + this.Is64Bit != 1) {
+			throw Exception("Not a valid 32/64 bit PE object file")
 		}
 
 		SymbolTableOffset := this.ReadUInt(8)
 		SymbolCount := this.ReadUInt(12)
-		SymbolNamesOffset := SymbolTableOffset + (SymbolCount * SIZEOF_SYMBOL)
+		
+		this.StringTableOffset := SymbolTableOffset + (SymbolCount * SIZEOF_SYMBOL)
 		
 		this.Symbols := []
 		this.SymbolsByName := {}
@@ -238,7 +249,7 @@ class PEObjectLinker extends LinkerBase {
 		SymbolIndex := 0
 		
 		while (SymbolIndex < SymbolCount) {
-			this.Symbols.Push(NextSymbol := this.ReadSymbolHeader(SymbolNamesOffset, SymbolTableOffset + (SymbolIndex * SIZEOF_SYMBOL)))
+			this.Symbols.Push(NextSymbol := this.ReadSymbolHeader(SymbolTableOffset + (SymbolIndex * SIZEOF_SYMBOL)))
 			
 			this.SymbolsByName[NextSymbol.Name] := NextSymbol
 
@@ -267,9 +278,11 @@ class PEObjectLinker extends LinkerBase {
 	}
 
 	DoStaticRelocations(Section) {
-		; Resolve any relocations which are independent of the image base/load address. On 64 bit, this is
-		;  anything RIP-relative to `Section`.
+		; Resolve any relocations which are independent of the image base/load address. 
+		; On 64 bit, this is anything RIP-relative to `Section`, or DISP8/DISP32 operands.
+		; On 32 bit, this is only DISP8/DISP32 operands, since RIP-relative doesn't exist.
 
+		static IMAGE_REL_I386_REL32  := 0x14
 		static IMAGE_REL_AMD64_REL32 := 0x4
 		
 		; Note: The relocation list is cloned since we'll be modifying it to remove any relocations resolved
@@ -283,7 +296,10 @@ class PEObjectLinker extends LinkerBase {
 				continue
 			}
 
-			if (Relocation.Type = IMAGE_REL_AMD64_REL32) {
+			Is32BitRel32 := this.Is32Bit && Relocation.Type = IMAGE_REL_I386_REL32
+			Is64BitRel32 := this.Is64Bit && Relocation.Type = IMAGE_REL_AMD64_REL32
+
+			if (Is32BitRel32 || Is64BitRel32) {
 				; Rel32, we need to find the distance between `RelocationAddress` and `SymbolAddress + *RelocationAddres`
 				;  and write it back to `RelocationAddress`.
 
@@ -292,7 +308,7 @@ class PEObjectLinker extends LinkerBase {
 				Offset := Section.Data.Read(Source, "Int")
 				Target := Relocation.Symbol.Value + Offset
 
-				Difference := Target - (Source + 4) ; An extra 4 is added to get the value of RIP while the instruction
+				Difference := Target - (Source + 4) ; An extra 4 is added to get the value of RIP (or EIP) while the instruction
 				; containing the RIP-relative address is executing.
 
 				Section.Data.Write(Difference, Source, "Int")
