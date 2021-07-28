@@ -21,6 +21,7 @@ These macros are as follows:
 
 * `MCL_EXPORT(Name)` <br> will "export" the function `Name` to AHK, allowing the code to function as more of a library. See `Examples/C_as_library.ahk` for an example of using compiled code as a library. <hr>
 * `MCL_EXPORT_INLINE(ReturnType, Name, Parameters)` <br> will export *and* define `Name` at the same time, in the same place. <hr>
+* `MCL_EXPORT_GLOBAL(Name)` <br> will export `Name` to AHK like it is a function. However, the "address" of the function is truly just the address of the global variable `Name`, and cannot be called like a function. See `Examples/C_set_global_from_AHK.ahk` for an example of getting/setting a C global variable from AHK. <hr>
 * `MCL_IMPORT(ReturnType, DllName, Name, ParameterTypes)` <br> will import the function `Name` from the `.dll` file `DllName`, and declare `Name` to be a function pointer to said function, with the given `ReturnType`/`ParameterTypes`. See `Examples/C_import_dll_function.ahk` for an example of this macro.
 
 Additionally, MCL provides a limited set of "fake" standard headers, which all use `mcl.h` to import/define implementations of common standard library functions.

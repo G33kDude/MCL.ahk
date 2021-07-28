@@ -91,6 +91,21 @@ class MCLTests {
                 Yunit.Assert(StrGet(pString, "UTF-8") = String)
             }
         }
+
+        GetSetGlobal() {
+            Code := MCL.FromC(Read("GetSetGlobalFromAHK.c"))
+
+            pResultString := DllCall(Code.Check, "Int", 20, "CDecl Ptr")
+            Yuint.Assert(StrGet(pResultString, "UTF-8") = "Oops, that's wrong")
+
+            ThePassword := NumGet(Code.Password, 0, "Int")
+            pResultString := DllCall(Code.Check, "Int", ThePassword, "CDecl Ptr")
+            Yuint.Assert(StrGet(pResultString, "UTF-8") = "You got the password right!")
+
+            NumPut(0, Code.Password, 0, "Int")
+            pResultString := DllCall(Code.Check, "Int", ThePassword, "CDecl Ptr")
+            Yuint.Assert(StrGet(pResultString, "UTF-8") = "Oops, that's wrong")
+        }
     }
 
     class CPP {

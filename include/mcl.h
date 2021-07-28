@@ -14,6 +14,9 @@ int __MCL_e_ ## Name () __attribute__((alias(#Name)));
 int __MCL_e_ ## Name () __attribute__((alias(#Name))); \
 ReturnType Name Parameters
 
+#define MCL_EXPORT_GLOBAL(Name) \
+extern char __MCL_e_ ## Name __attribute__((alias(#Name)));
+
 #define MCL_QUOTE(X) #X
 
 #define MCL_IMPORT(ReturnType, DllName, Name, ParameterTypes) \
