@@ -16,7 +16,7 @@ int __main() {
 
 )
 
-Code := MCL.AHKFromC(C, false) ; Compile and stringify the code, but don't format it as an AHK string literal (since we're going to load it again momentarily)
+Code := MCL.AHKFromC(C, MCL.Options.DoNotFormat) ; Compile and stringify the code, but don't format it as an AHK string literal (since we're going to load it again momentarily)
 
 pCode := MCL.FromString(Code)
 

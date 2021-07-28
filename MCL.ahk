@@ -97,12 +97,15 @@ class MCL {
 
 	static CompilerPrefix := ""
 	static CompilerSuffix := ".exe"
-	static Bitness        := A_PtrSize * 8
 
-	Compile(Compiler, Code, ExtraOptions := "") {
+	Compile(Compiler, Code, ExtraOptions := "", Bitness := 0) {
 		IncludeFolder := this.GetTempPath(A_WorkingDir, "mcl-include-", "")
 		InputFile     := this.GetTempPath(A_WorkingDir, "mcl-input-", ".c")
 		OutputFile    := this.GetTempPath(A_WorkingDir, "mcl-output-", ".o")
+
+		if (Bitness = 0) {
+			Bitness := A_PtrSize * 8
+		}
 
 		try {
 			FileOpen(InputFile, "w").Write(code)
@@ -114,7 +117,7 @@ class MCL {
 			FileCopyDir, %A_LineFile%/../include, % IncludeFolder
 			
 			shell := ComObjCreate("WScript.Shell")
-			exec := shell.Exec(this.CompilerPrefix Compiler this.CompilerSuffix " -m" this.Bitness " " InputFile " -o " OutputFile " -I " IncludeFolder " -D MCL_BITNESS=" this.Bitness ExtraOptions " -ffreestanding -nostdlib -Wno-attribute-alias -fno-leading-underscore --function-sections --data-sections -c")
+			exec := shell.Exec(this.CompilerPrefix Compiler this.CompilerSuffix " -m" Bitness " " InputFile " -o " OutputFile " -I " IncludeFolder " -D MCL_BITNESS=" Bitness ExtraOptions " -ffreestanding -nostdlib -Wno-attribute-alias -fno-leading-underscore --function-sections --data-sections -c")
 			exec.StdIn.Close()
 			
 			if !exec.StdErr.AtEndOfStream
@@ -156,11 +159,21 @@ class MCL {
 		Linker.MakeSectionStandalone(TextSection)
 		Linker.DoStaticRelocations(TextSection)
 
-		Symbols := {}
+		Imports := {}
+		Exports := {}
 
 		for SymbolName, Symbol in TextSection.SymbolsByName {
-			if (SymbolName = "__main" || RegExMatch(SymbolName, "O)^__MCL_(e|i)_(\w+)")) {
-				Symbols[SymbolName] := Symbol.Value
+			if (SymbolName = "__main" || RegExMatch(SymbolName, "O)^__MCL_(e|i)_([\w\$]+)", Match)) {
+				if (IsObject(Match)) {
+					SymbolName := Match[2]
+				}
+				
+				if (Match[1] = "i") {
+					Imports[SymbolName] := Symbol.Value
+				}
+				else {
+					Exports[SymbolName] := Symbol.Value
+				}
 			}
 		}
 
@@ -195,31 +208,34 @@ class MCL {
 		;F.RawWrite(pCode + 0, CodeSize)
 		;F.Close()
 
-		return [pCode, CodeSize, Symbols, Relocations]
+		return [pCode, CodeSize, Imports, Exports, Relocations, Bitness]
 	}
 	
-	Load(pCode, CodeSize, Symbols, Relocations) {
-		for SymbolName, SymbolOffset in Symbols {
-			if (RegExMatch(SymbolName, "O)__MCL_i_(\w+?)_(\w+)", Match)) {
-				DllName := Match[1]
-				FunctionName := Match[2]
+	Load(pCode, CodeSize, Imports, Exports, Relocations, Bitness) {
+		for ImportName, ImportOffset in Imports {
+			Import := StrSplit(ImportName, "$")
+			DllName := Import[1]
+			FunctionName := Import[2]
 
-				DllCall("SetLastError", "Int", 0)
-				hDll := DllCall("GetModuleHandle", "Str", DllName, "Ptr")
+			DllCall("SetLastError", "Int", 0) ; Clear A_LastError. Something has left it set here before, and GetModuleHandle doesn't clear it.
+			hDll := DllCall("GetModuleHandle", "Str", DllName, "Ptr")
 
-				if (ErrorLevel || A_LastError) {
-					Throw Exception("Could not load dll " DllName ", ErrorLevel " ErrorLevel ", LastError " Format("{:0x}", A_LastError))
-				}
-
-				DllCall("SetLastError", "Int", 0)
-				pFunction := DllCall("GetProcAddress", "Ptr", hDll, "AStr", FunctionName, "Ptr")
-
-				if (ErrorLevel || A_LastError) {
-					Throw Exception("Could not find function " FunctionName " from " DllName ".dll, ErrorLevel " ErrorLevel ", LastError " Format("{:0x}", A_LastError))
-				}
-
-				NumPut(pFunction, pCode + 0, SymbolOffset, "Ptr")
+			if (ErrorLevel || A_LastError) {
+				Throw Exception("Could not load dll " DllName ", ErrorLevel " ErrorLevel ", LastError " Format("{:0x}", A_LastError))
 			}
+
+			DllCall("SetLastError", "Int", 0)
+			pFunction := DllCall("GetProcAddress", "Ptr", hDll, "AStr", FunctionName, "Ptr")
+
+			if (ErrorLevel || A_LastError) {
+				Throw Exception("Could not find function " FunctionName " from " DllName ".dll, ErrorLevel " ErrorLevel ", LastError " Format("{:0x}", A_LastError))
+			}
+
+			NumPut(pFunction, pCode + 0, ImportOffset, "Ptr")
+		}
+
+		for ExportName, ExportOffset in Exports {
+			Exports[ExportName] += pCode
 		}
 
 		for k, Offset in Relocations {
@@ -229,34 +245,16 @@ class MCL {
 		
 		if !DllCall("VirtualProtect", "Ptr", pCode, "Ptr", CodeSize, "UInt", 0x40, "UInt*", OldProtect, "UInt")
 			Throw Exception("Failed to mark MCL memory as executable")
-		
-		Exports := {}
 
-		for SymbolName, SymbolOffset in Symbols {
-			if (RegExMatch(SymbolName, "O)__MCL_e_(\w+)", Match)) {
-				Exports[Match[1]] := pCode + SymbolOffset
-			}
-		}
-
-		if (Exports.Count()) {
-			return Exports
+		if (Exports.Count() = 1 && Exports.HasKey("__main")) {
+			return Exports["__main"]
 		}
 		else {
-			return pCode + Symbols["__main"]
+			return Exports
 		}
 	}
-	
-	FromC(Code) {
-		return this.Load(this.Compile("gcc", Code)*)
-	}
-	
-	FromCPP(Code) {
-		return this.Load(this.Compile("g++", "extern ""C"" {`n" Code "`n}", " -fno-exceptions -fno-rtti")*)
-	}
-	
-	Pack(FormatAsStringLiteral, pCode, CodeSize, Symbols, Relocations) {
 
-		; First, compress the actual code bytes
+	Pack(FormatAsStringLiteral, pCode, CodeSize, Imports, Exports, Relocations, Bitness) {
 		CompressionBufferSize := VarSetCapacity(CompressionBuffer, CodeSize * 2, 0)
 		pCompressionBuffer := &CompressionBuffer
 
@@ -265,11 +263,17 @@ class MCL {
 
 		SymbolsString := ""
 
-		for SymbolName, SymbolOffset in Symbols {
-			SymbolsString .= SymbolName ":" SymbolOffset ","
+		for ImportName, ImportOffset in Imports {
+			SymbolsString .= ImportName ":" ImportOffset ","
 		}
 
-		SymbolsString .= "__size:" CodeSize
+		SymbolsString := SubStr(SymbolsString, 1, -1) ";"
+
+		for ExportName, ExportOffset in Exports {
+			SymbolsString .= ExportName ":" ExportOffset ","
+		}
+
+		SymbolsString := SubStr(SymbolsString, 1, -1)
 
 		RelocationsString := ""
 
@@ -289,12 +293,12 @@ class MCL {
 				Base64 := SubStr(Base64, (120-8)+1)
 			}
 
-			return """V0.1;" SymbolsString ";" RelocationsString ";""" Out
+			return Bitness ";" SymbolsString ";" RelocationsString ";" CodeSize ";""" Out
 		}
 		else {
 			; Don't format the output, return the string that would result from AHK parsing the string literal returned when `FormatAsStringLiteral` is true
 
-			return "V0.1;" SymbolsString ";" RelocationsString ";" Base64
+			return Bitness ";" SymbolsString ";" RelocationsString ";" CodeSize ";" Base64
 		}
 	}
 
@@ -328,7 +332,7 @@ class MCL {
 		return Template
 	}
 
-	StandalonePack(Name, pCode, CodeSize, Symbols, Relocations) {
+	StandalonePack(Name, pCode, CodeSize, Imports, Exports, Relocations, Bitness) {
 		; First, compress the actual code bytes
 		CompressionBufferSize := VarSetCapacity(CompressionBuffer, CodeSize * 2, 0)
 		pCompressionBuffer := &CompressionBuffer
@@ -336,21 +340,15 @@ class MCL {
 		CompressedSize := this.LZ.Compress(pCode, CodeSize, pCompressionBuffer, CompressionBufferSize)
 		Base64 := this.Base64.Encode(pCompressionBuffer, CompressedSize)
 
-		Imports := {}
-		Exports := {}
-
-		for SymbolName, SymbolOffset in Symbols {
-			if (RegExMatch(SymbolName, "O)__MCL_i_(\w+)_(\w+)", Match)) {
-				Imports[Match[1] "_" Match[2]] := SymbolOffset
-			}
-			else if (RegExMatch(SymbolName, "O)__MCL_e_(\w+)", Match)) {
-				Exports[Match[1]] := SymbolOffset
-			}
-		}
-
 		while StrLen(Base64) {
 			Out .= "`n. """ SubStr(Base64, 1, 120-8) """"
 			Base64 := SubStr(Base64, (120-8)+1)
+		}
+		
+		if (Exports.Count() = 1 && Exports.HasKey("__main")) {
+			MainOffset := Exports["__main"]
+
+			Exports := {}
 		}
 
 		FileRead, Template, %A_LineFile%/../StandaloneTemplate.ahk
@@ -358,72 +356,173 @@ class MCL {
 		Template := StrReplace(Template, "$Name", Name)
 		Template := StrReplace(Template, "$CodeBase64", """""" Out)
 		Template := StrReplace(Template, "$CodeSize", CodeSize)
+		Template := StrReplace(Template, "$Bitness", Bitness)
 
 		Template := this.DoTemplateBlock(Template, "Imports", Imports)
 		Template := this.DoTemplateBlock(Template, "Relocations", Relocations, true)
 		Template := this.DoTemplateBlock(Template, "Exports", Exports)
 
-		Template := StrReplace(Template, "$MainOffset", Symbols["__main"])
+		Template := StrReplace(Template, "$MainOffset", MainOffset)
 
 		Template := RegexReplace(Template, "\n\s*\n")
 
 		return Template
 	}
-	
-	AHKFromC(Code, FormatAsStringLiteral := true) {
-		return this.Pack(FormatAsStringLiteral, this.Compile("gcc", Code)*)
-	}
-	StandaloneAHKFromC(Code, Name := "MyMCLC") {
-		return this.StandalonePack(Name, this.Compile("gcc", Code)*)
-	}
-	
-	AHKFromCPP(Code, FormatAsStringLiteral := true) {
-		return this.Pack(FormatAsStringLiteral, this.Compile("g++", "extern ""C"" {`n" Code "`n}", " -fno-exceptions -fno-rtti")*)
-	}
-	StandaloneAHKFromCPP(Code, Name := "MyMCLCPP") {
-		return this.StandalonePack(Name, this.Compile("g++", "extern ""C"" {`n" Code "`n}", " -fno-exceptions -fno-rtti")*)
+
+	class Options {
+		static OutputAHKBit  := 0
+		static Output32Bit   := 1
+		static Output64Bit   := 2
+		static OutputBothBit := 3
+		static OutputMask    := 3
+
+		static FormatAsStringLiteral := 0
+		static DoNotFormat           := 4
 	}
 
+	AHKFromLanguage(Compiler, Code, Options, CompilerOptions := "") {
+		Literal := Options & this.Options.FormatAsStringLiteral
 
-	FromString(Code) {
-		Formats := {"V0": 3, "V0.1": 4}
+		Result := (Literal ? """" : "") "V0.3|"
 
-		Parts := StrSplit(Code, ";")
-		Version := Parts[1]
-
-		if (!Formats.HasKey(Version) || Parts.Count() != Formats[Version] ) {
-			Throw "Unknown/corrupt MCL packed code format"
-		}
-
-		Symbols := {}
-
-		for k, SymbolEntry in StrSplit(Parts[2], ",") {
-			SymbolEntry := StrSplit(SymbolEntry, ":")
-
-			Symbols[SymbolEntry[1]] := SymbolEntry[2] + 0
-		}
-
-		Relocations := []
-
-		if (Version = "V0") {
-			CodeBase64 := Parts[3]
+		if (Options & this.Options.OutputMask = this.Options.OutputAHKBit) {
+			Result .= this.Pack(Literal, this.Compile(Compiler, Code, CompilerOptions)*)
 		}
 		else {
-			for k, Relocation in StrSplit(Parts[3], ",") {
-				Relocations.Push(Relocation + 0)
+			if (Options & this.Options.Output32Bit) {
+				Result .= this.Pack(Literal, this.Compile(Compiler, Code, CompilerOptions, 32)*)
 			}
 
-			CodeBase64 := Parts[4]
-		}		
+			if (Options & this.Options.Output64Bit) {
+				if (Options & this.Options.Output32Bit) {
+					Result .= (Literal ? "`n.""" : "") "|"
+				}
 
-		DecompressedSize := Symbols.__Size
-		
-		if !(pBinary := DllCall("GlobalAlloc", "UInt", 0, "Ptr", DecompressedSize, "Ptr"))
-			throw Exception("Failed to reserve MCL memory")
+				Result .= this.Pack(Literal, this.Compile(Compiler, Code, CompilerOptions, 64)*)
+			}
+		}
 
-		DecodedSize := this.Base64.Decode(CodeBase64, Data)
-		this.LZ.Decompress(&Data, DecodedSize, pBinary, DecompressedSize)
-		
-		return this.Load(pBinary, DecompressedSize, Symbols, Relocations)
+		return Result
+	}
+
+	StandaloneAHKFromLanguage(Compiler, Code, Options, CompilerOptions := "", Name := "") {
+		if (Options & this.Options.OutputMask = this.Options.OutputAHKBit) {
+			return this.StandalonePack(Name, this.Compile(Compiler, Code, CompilerOptions)*)
+		}
+		else {
+			Result := ""
+
+			if (Options & this.Options.Output32Bit) {
+				Result .= this.StandalonePack(Name "32Bit", this.Compile(Compiler, Code, CompilerOptions, 32)*)
+			}
+
+			if (Options & this.Options.Output64Bit) {
+				Result .= this.StandalonePack(Name "64Bit", this.Compile(Compiler, Code, CompilerOptions, 64)*)
+
+				if (Options & this.Options.Output32Bit) {
+					Result .= "`n" Name "() {`n`treturn A_PtrSize = 4 ? " Name "32Bit() : " Name "64Bit()`n}`n"
+				}
+			}
+
+			return Result
+		}
+	}
+
+	FromC(Code, Options := 0) {
+		Bitness := A_PtrSize * 8
+
+		if (Options & this.Options.Output32Bit) {
+			Bitness := 32
+		}
+		else if (Options & this.Options.Output32Bit) {
+			Bitness := 64
+		}
+
+		return this.Load(this.Compile("gcc", Code,, Bitness)*)
+	}
+	AHKFromC(Code, Options := 0) {
+		return this.AHKFromLanguage("gcc", Code, Options)
+	}
+	StandaloneAHKFromC(Code, Options := 0, Name := "MyC") {
+		return this.StandaloneAHKFromLanguage("gcc", Code, Options,, Name)
+	}
+	
+	FromCPP(Code, Options := 0) {
+		Bitness := A_PtrSize * 8
+
+		if (Options & this.Options.Output32Bit) {
+			Bitness := 32
+		}
+		else if (Options & this.Options.Output32Bit) {
+			Bitness := 64
+		}
+
+		return this.Load(this.Compile("g++", "extern ""C"" {`n" Code "`n}", " -fno-exceptions -fno-rtti", Bitness)*)
+	}
+	AHKFromCPP(Code, Options := 0) {
+		return this.AHKFromLanguage("g++", "extern ""C"" {`n" Code "`n}", Options, " -fno-exceptions -fno-rtti")
+	}
+	StandaloneAHKFromCPP(Code, Options := 0, Name := "MyCPP") {
+		return this.StandaloneAHKFromLanguage("g++", "extern ""C"" {`n" Code "`n}", Options, " -fno-exceptions -fno-rtti", Name)
+	}
+
+	FromString(Code) {
+		Parts := StrSplit(Code, "|")
+		Version := Parts.RemoveAt(1)
+
+		if (Version != "V0.3") {
+			Throw Exception("Unknown/corrupt MCL packed code format")
+		}
+
+		for k, Flavor in Parts {
+			Flavor := StrSplit(Flavor, ";")
+
+			if (Flavor.Count() != 6) {
+				Throw Exception("Unknown/corrupt MCL packed code format")
+			}
+
+			Bitness           := Flavor[1] + 0
+			ImportsString     := Flavor[2]
+			ExportsString     := Flavor[3]
+			RelocationsString := Flavor[4]
+			CodeSize          := Flavor[5] + 0
+			CodeBase64        := Flavor[6]
+
+			if (Bitness != (A_PtrSize * 8)) {
+				continue
+			}
+
+			Imports := {}
+
+			for k, ImportEntry in StrSplit(ImportsString, ",") {
+				ImportEntry := StrSplit(ImportEntry, ":")
+
+				Imports[ImportEntry[1]] := ImportEntry[2] + 0
+			}
+
+			Exports := {}
+
+			for k, ExportEntry in StrSplit(ExportsString, ",") {
+				ExportEntry := StrSplit(ExportEntry, ":")
+
+				Exports[ExportEntry[1]] := ExportEntry[2] + 0
+			}
+
+			Relocations := []
+
+			for k, Relocation in StrSplit(RelocationsString, ",") {
+				Relocations.Push(Relocation + 0)
+			}
+			
+			if !(pBinary := DllCall("GlobalAlloc", "UInt", 0, "Ptr", CodeSize, "Ptr"))
+				throw Exception("Failed to reserve MCL memory")
+
+			DecodedSize := this.Base64.Decode(CodeBase64, Data)
+			this.LZ.Decompress(&Data, DecodedSize, pBinary, CodeSize)
+			
+			return this.Load(pBinary, CodeSize, Imports, Exports, Relocations, Bitness)
+		}
+
+		Throw Exception("Program does not have a " (A_PtrSize * 8) " bit version")
 	}
 }

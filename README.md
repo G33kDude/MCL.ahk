@@ -50,13 +50,26 @@ See `Examples/C_return_struct_to_ahk.ahk` for an example of code with only a `__
 
 Now, for the API:
 
-* `MCL.FromC(Code)` 
-* `MCL.FromCPP(Code)` <br> Compiles `Code` as C/C++ (throwing an exception for any compile errors) and returns the compiled code. <hr>
+* `MCL.FromC(Code, Options := MCL.Options.OutputAHKBit)` 
+* `MCL.FromCPP(Code, Options := MCL.Options.OutputAHKBit)` <br> Compiles `Code` as C/C++ (throwing an exception for any compile errors) and returns the compiled code. <hr>
 * `MCL.FromString(Code)` <br> Loads `Code`, which is pre-compiled code packed into a string (returned by one of the following methods) and returns the loaded compiled code.
-* `MCL.AHKFromC(Code)`
-* `MCL.AHKFromCPP(Code)` <br> Like `MCL.FromC()`/`MCL.FromCPP()`, but packs the compiled code into a string formatted as AHK source code, which `MCL.FromString(Code)` can load. <hr>
-* `MCL.StandaloneAHKFromC(Code, Name)` 
-* `MCL.StandaloneAHKFromCPP(Code, Name)` <br> Like `MCL.AHKFromC(Code)`, but returns code which does not require MCL at all, and can be used without including `MCL.ahk`. This code will be formatted as a single function, which returns the compiled code in the same format as all other functions.
+* `MCL.AHKFromC(Code, Options := MCL.Options.OutputAHKBit)`
+* `MCL.AHKFromCPP(Code, Options := MCL.Options.OutputAHKBit)` <br> Like `MCL.FromC()`/`MCL.FromCPP()`, but packs the compiled code into a string formatted as AHK source code, which `MCL.FromString(Code)` can load. <hr>
+* `MCL.StandaloneAHKFromC(Code, Name, Options := MCL.Options.OutputAHKBit)` 
+* `MCL.StandaloneAHKFromCPP(Code, Name, Options := MCL.Options.OutputAHKBit)` <br> Like `MCL.AHKFromC(Code)`, but returns code which does not require MCL at all, and can be used without including `MCL.ahk`. This code will be formatted as a single function, which returns the compiled code in the same format as all other functions.
+
+For any method which takes an `Options` parameter, the following options can be provided to control the bitness/format of the generated code:
+
+* `MCL.Options.OutputAHKBit` <br> Generates code which will run in `A_PtrSize * 8` AHK. So, on AHK U32, this flag tells MCL to generate 32 bit code. On AHK U64, this flag tells MCL to generate 64 bit code.
+* `MCL.Options.Output32Bit` <br> Generates 32 bit code, ignoring the bitness of the AHK executable.
+* `MCL.Options.Output64Bit` <br> Generates 64 bit code, ignoring the bitness of the AHK executable.
+* `MCL.Options.OutputBothBit` <br> Only valid for methods which generate AHK code, such as `MCL.AHKFromC` or `MCL.StandaloneAHKFromCPP`. Generates code which is both 32 and 64 bit, and can run under either. This means compiling the code twice, once for each bitness. This also effectively doubles the size of the code.
+
+However, if MCL is running under 32 bit AHK, the options `MCL.Options.Output64Bit` and `MCL.Options.OutputBothBit` will not work. This is because processing 64 bit code/data requires using 64 bit integers, which are not supported by 32 bit AHK.
+
+Additionally, the following flag exists for the `MCL.AHKFromC` and `MCL.AHKFromCPP` methods:
+
+* `MCL.Options.DoNotFormat` <br> Do not format the resulting code as an AHK string literal, instead simply return it as a string. This allows for chaining, like `MCL.FromString(MCL.AHKFromC(Code, MCL.Options.DoNotFormat))`.
 
 And that's it.
 

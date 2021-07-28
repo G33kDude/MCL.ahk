@@ -1,7 +1,10 @@
-﻿
-$Name() {
+﻿$Name() {
 	static CodeBase64 := $CodeBase64
 	static Code := false
+
+	if ((A_PtrSize * 8) != $Bitness) {
+		Throw Exception("$Name does not support " (A_PtrSize * 8) " bit AHK, please run using $Bitness bit AHK")
+	}
 
 	if (!Code) {
 		if !DllCall("Crypt32\CryptStringToBinary", "Str", CodeBase64, "UInt", 0, "UInt", 1, "UPtr", 0, "UInt*", CompressedSize, "Ptr", 0, "Ptr", 0, "UInt")
@@ -20,7 +23,7 @@ $Name() {
 	
 $HasImports
 		for ImportName, ImportOffset in $Imports {
-			Import := StrSplit(ImportName, "_")
+			Import := StrSplit(ImportName, "$")
 			
 			hDll := DllCall("GetModuleHandle", "Str", Import[1], "Ptr")
 
@@ -50,7 +53,7 @@ $HasExports
 		Exports := {}
 
 		for ExportName, ExportOffset in $Exports {
-			Exports[ExportName] := pCode + SymbolOffset
+			Exports[ExportName] := pCode + ExportOffset
 		}
 
 		Code := Exports
