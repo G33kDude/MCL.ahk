@@ -177,6 +177,10 @@ class MCL {
 			}
 		}
 
+		if (Exports.Count() = 0) {
+			Throw Exception("Code does not define `__main`, or export any functions")
+		}
+
 		static IMAGE_REL_I386_DIR32   := 0x6
 		static IMAGE_REL_AMD64_ADDR64 := 0x1
 
