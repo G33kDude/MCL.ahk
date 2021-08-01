@@ -38,6 +38,13 @@ If calling a standard library function gives you an error, then that function is
 
 In C++, `mcl.h` uses `malloc`/`free` in order to implement the global `new`/`delete` operators, allowing you to use them in your C++. For an example of using `new`/`delete`, see `Examples/C++_with_new_delete.ahk`.
 
+MCL also provides a limited set of "fake" Windows API headers, designed to make interoperability with the Windows API based on MS documentation examples easier. These do not and are not intended to match the Windows SDK originals, but follow along with similar naming at a much smaller coverage.
+
+The following headers are provided.
+
+* `windows.h` (note: defines data types as specified here https://docs.microsoft.com/en-us/windows/win32/winprog/windows-data-types)
+* `oaidl.h` (note: defines some common COM types)
+
 ### From AHK
 
 In AHK, MCL provides all functionality through the `MCL` class. 
