@@ -6,6 +6,10 @@
 		Throw Exception("$Name does not support " (A_PtrSize * 8) " bit AHK, please run using $Bitness bit AHK")
 	}
 
+	; MCL standalone loader https://github.com/G33kDude/MCLib.ahk
+	; Copyright (c) 2021 G33kDude, CloakerSmoker (CC-BY-4.0)
+	; https://creativecommons.org/licenses/by/4.0/
+
 	if (!Code) {
 		if !DllCall("Crypt32\CryptStringToBinary", "Str", CodeBase64, "UInt", 0, "UInt", 1, "UPtr", 0, "UInt*", CompressedSize, "Ptr", 0, "Ptr", 0, "UInt")
 			throw Exception("Failed to parse MCLib b64 to binary")
