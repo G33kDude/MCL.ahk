@@ -56,8 +56,8 @@ Now, for the API:
 * `MCL.FromString(Code)` <br> Loads `Code`, which is pre-compiled code packed into a string (returned by one of the following methods) and returns the loaded compiled code.
 * `MCL.AHKFromC(Code, Options := MCL.Options.OutputAHKBit)`
 * `MCL.AHKFromCPP(Code, Options := MCL.Options.OutputAHKBit)` <br> Like `MCL.FromC()`/`MCL.FromCPP()`, but packs the compiled code into a string formatted as AHK source code, which `MCL.FromString(Code)` can load. <hr>
-* `MCL.StandaloneAHKFromC(Code, Name, Options := MCL.Options.OutputAHKBit)` 
-* `MCL.StandaloneAHKFromCPP(Code, Name, Options := MCL.Options.OutputAHKBit)` <br> Like `MCL.AHKFromC(Code)`, but returns code which does not require MCL at all, and can be used without including `MCL.ahk`. This code will be formatted as a single function, which returns the compiled code in the same format as all other functions.
+* `MCL.StandaloneAHKFromC(Code, Options := MCL.Options.OutputAHKBit, Name := "MyC")` 
+* `MCL.StandaloneAHKFromCPP(Code, Options := MCL.Options.OutputAHKBit, Name := "MyCPP")` <br> Like `MCL.AHKFromC(Code)`, but returns code which does not require MCL at all, and can be used without including `MCL.ahk`. This code will be formatted as a single function, which returns the compiled code in the same format as all other functions.
 
 For any method which takes an `Options` parameter, the following options can be provided to control the bitness/format of the generated code:
 
