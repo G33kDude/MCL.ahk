@@ -140,9 +140,14 @@ class MCL {
 		}
 		finally {
 			FileDelete, % InputFile
-			FileDelete, % OutputFile
-
 			FileRemoveDir, % IncludeFolder, 1
+
+			try {
+				; Depending on what when wrong, the output file might not exist yet.
+				; And if we're already in a `try {}` block, then this line will throw when trying to delete the file.
+
+				FileDelete, % OutputFile
+			}
 		}
 		
 		Linker := new PEObjectLinker(pPE, Size)
