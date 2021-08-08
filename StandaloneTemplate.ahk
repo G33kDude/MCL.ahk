@@ -11,10 +11,7 @@
 	; https://creativecommons.org/licenses/by/4.0/
 
 	if (!Code) {
-		if !DllCall("Crypt32\CryptStringToBinary", "Str", CodeBase64, "UInt", 0, "UInt", 1, "UPtr", 0, "UInt*", CompressedSize, "Ptr", 0, "Ptr", 0, "UInt")
-			throw Exception("Failed to parse MCLib b64 to binary")
-		
-		CompressedSize := VarSetCapacity(DecompressionBuffer, CompressedSize, 0)
+		CompressedSize := VarSetCapacity(DecompressionBuffer, $CompressedSize, 0)
 
 		if !DllCall("Crypt32\CryptStringToBinary", "Str", CodeBase64, "UInt", 0, "UInt", 1, "Ptr", &DecompressionBuffer, "UInt*", CompressedSize, "Ptr", 0, "Ptr", 0, "UInt")
 			throw Exception("Failed to convert MCLib b64 to binary")

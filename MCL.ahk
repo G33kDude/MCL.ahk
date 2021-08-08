@@ -366,6 +366,7 @@ class MCL {
 		Template := StrReplace(Template, "$CodeBase64", """""" Out)
 		Template := StrReplace(Template, "$CodeSize", CodeSize)
 		Template := StrReplace(Template, "$Bitness", Bitness)
+		Template := StrReplace(Template, "$CompressedSize", CompressedSize)
 
 		Template := this.DoTemplateBlock(Template, "Imports", Imports)
 		Template := this.DoTemplateBlock(Template, "Relocations", Relocations, true)
