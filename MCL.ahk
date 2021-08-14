@@ -423,14 +423,14 @@ class MCL {
 			Result := ""
 
 			if (Options & this.Options.Output32Bit) {
-				Result .= this.StandalonePack(Name "32Bit", this.Compile(Compiler, Code, CompilerOptions, 32)*)
+				Result .= this.StandalonePack(Name "32Bit", this.Compile(Compiler, Code, CompilerOptions, 32)*) "`n"
 			}
 
 			if (Options & this.Options.Output64Bit) {
-				Result .= this.StandalonePack(Name "64Bit", this.Compile(Compiler, Code, CompilerOptions, 64)*)
+				Result .= this.StandalonePack(Name "64Bit", this.Compile(Compiler, Code, CompilerOptions, 64)*) "`n"
 
 				if (Options & this.Options.Output32Bit) {
-					Result .= "`n" Name "() {`n`treturn A_PtrSize = 4 ? " Name "32Bit() : " Name "64Bit()`n}`n"
+					Result .= Name "() {`n`treturn A_PtrSize = 4 ? this." Name "32Bit() : this." Name "64Bit()`n}`n"
 				}
 			}
 
