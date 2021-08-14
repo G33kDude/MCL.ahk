@@ -24,6 +24,7 @@
 #define DISP_E_BADVARTYPE 0x80020008
 #define DISP_E_BADPARAMCOUNT 0x8002000E
 
+// https://github.com/tpn/winsdk-10/blob/master/Include/10.0.16299.0/shared/wtypes.h
 #define VT_EMPTY 0
 #define VT_NULL 1
 #define VT_I4 3
@@ -183,33 +184,33 @@ typedef struct tagEXCEPINFO
 
 typedef struct IDispatchVtbl
 {
-	HRESULT(*QueryInterface)
+	__stdcall HRESULT(*QueryInterface)
 	(
 		IDispatch *This,
 		/* [in] */ REFIID riid,
 		/* [out] */ void **ppvObject);
 
-	ULONG(*AddRef)
+	__stdcall ULONG(*AddRef)
 	(
 		IDispatch *This);
 
-	ULONG(*Release)
+	__stdcall ULONG(*Release)
 	(
 		IDispatch *This);
 
-	HRESULT(*GetTypeInfoCount)
+	__stdcall HRESULT(*GetTypeInfoCount)
 	(
 		IDispatch *This,
 		/* [out] */ UINT *pctinfo);
 
-	HRESULT(*GetTypeInfo)(
+	__stdcall HRESULT(*GetTypeInfo)(
 		IDispatch * This,
 		/* [in] */ UINT iTInfo,
 		/* [in] */ LCID lcid,
 		// /* [out] */ ITypeInfo **ppTInfo);
 		/* [out] */ void **ppTInfo);
 
-	HRESULT(*GetIDsOfNames)
+	__stdcall HRESULT(*GetIDsOfNames)
 	(
 		IDispatch *This,
 		/* [in] */ REFIID riid,
@@ -218,7 +219,7 @@ typedef struct IDispatchVtbl
 		/* [in] */ LCID lcid,
 		/* [out] */ DISPID *rgDispId);
 
-	HRESULT(*Invoke)
+	__stdcall HRESULT(*Invoke)
 	(
 		IDispatch *This,
 		/* [in] */ DISPID dispIdMember,
