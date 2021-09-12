@@ -18,6 +18,8 @@
 		
 		if !(pCode := DllCall("GlobalAlloc", "UInt", 0, "Ptr", $CodeSize, "Ptr"))
 			throw Exception("Failed to reserve MCLib memory")
+			
+		DecompressedSize := 0
 
 		if (DllCall("ntdll\RtlDecompressBuffer", "UShort", 0x102, "Ptr", pCode, "UInt", $CodeSize, "Ptr", &DecompressionBuffer, "UInt", CompressedSize, "UInt*", DecompressedSize, "UInt"))
 			throw Exception("Error calling RtlDecompressBuffer",, Format("0x{:08x}", r))
