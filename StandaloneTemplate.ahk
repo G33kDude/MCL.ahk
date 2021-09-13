@@ -48,7 +48,9 @@ $HasRelocations
 			NumPut(Old + pCode, pCode + 0, Offset, "Ptr")
 		}
 $HasRelocations
-		
+
+		OldProtect := 0
+
 		if !DllCall("VirtualProtect", "Ptr", pCode, "Ptr", $CodeSize, "UInt", 0x40, "UInt*", OldProtect, "UInt")
 			Throw Exception("Failed to mark MCLib memory as executable")
 
