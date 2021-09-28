@@ -99,8 +99,12 @@ class MCL {
 	static CompilerSuffix := ".exe"
 
 	CompilersExist(Prefix, Suffix) {
+		; True results are wrapped in an array since `Prefix` could be an empty
+		;  string but still be a correct compiler path. So we can't just 
+		;   `return Prefix` since `Prefix` itself can be false.
+
 		if (FileExist(Prefix "gcc" Suffix) && FileExist(Prefix "g++" Suffix)) {
-			return Prefix
+			return [Prefix]
 		}
 
 		EnvGet, SystemPath, PATH
@@ -109,7 +113,7 @@ class MCL {
 			NewPrefix := Folder "\" Prefix
 			
 			if (FileExist(NewPrefix "gcc" Suffix) && FileExist(NewPrefix "g++" Suffix)) {
-				return NewPrefix
+				return [NewPrefix]
 			}
 		}
 
@@ -127,7 +131,7 @@ class MCL {
 		if (Prefix := MCL.CompilersExist(MCL.CompilerPrefix "x86_64-w64-mingw32-", MCL.CompilerSuffix)) {
 			; Compiler executables might be named like they would be on Linux
 
-			MCL.CompilerPrefix := Prefix
+			MCL.CompilerPrefix := Prefix[1]
 			Return
 		}
 
