@@ -98,7 +98,47 @@ class MCL {
 	static CompilerPrefix := ""
 	static CompilerSuffix := ".exe"
 
+	CompilersExist(Prefix, Suffix) {
+		if (FileExist(Prefix "gcc" Suffix) && FileExist(Prefix "g++" Suffix)) {
+			return Prefix
+		}
+
+		EnvGet, SystemPath, PATH
+
+		for k, Folder in StrSplit(SystemPath, ";") {
+			NewPrefix := Folder "\" Prefix
+			
+			if (FileExist(NewPrefix "gcc" Suffix) && FileExist(NewPrefix "g++" Suffix)) {
+				return NewPrefix
+			}
+		}
+
+		return false
+	}
+
+	TryFindCompilers() {
+		; Attempt to automatically set MCL.CompilerPrefix based on PATH and known cross compiler naming schemes
+		
+		if (MCL.CompilersExist(MCL.CompilerPrefix, MCL.CompilerSuffix)) {
+			; The default (or user provided values) are correct, no changes needed
+			return
+		}
+		
+		if (Prefix := MCL.CompilersExist(MCL.CompilerPrefix "x86_64-w64-mingw32-", MCL.CompilerSuffix)) {
+			; Compiler executables might be named like they would be on Linux
+
+			MCL.CompilerPrefix := Prefix
+			Return
+		}
+
+		; Oops, I don't know any other naming schemes. Ah well, this is good enough to autodected mingw-w64 installed through cygwin.
+
+		Throw Exception("MCL could find gcc and g++, please manually specify the path both can be found at via 'MCL.CompilerPrefix'")
+	}
+
 	Compile(Compiler, Code, ExtraOptions := "", Bitness := 0) {
+		MCL.TryFindCompilers()
+		
 		IncludeFolder := this.GetTempPath(A_WorkingDir, "mcl-include-", "")
 		InputFile     := this.GetTempPath(A_WorkingDir, "mcl-input-", ".c")
 		OutputFile    := this.GetTempPath(A_WorkingDir, "mcl-output-", ".o")

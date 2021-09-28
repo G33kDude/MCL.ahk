@@ -1,6 +1,8 @@
 #ifndef STRING_HEADER
 #define STRING_HEADER
 
+#include <mcl.h>
+
 MCL_IMPORT(int, msvcrt, isspace, (int));
 MCL_IMPORT(int, msvcrt, tolower, (int));
 MCL_IMPORT(int, msvcrt, toupper, (int));
@@ -17,8 +19,8 @@ MCL_IMPORT(char*, msvcrt, strerror, (int));
 
 MCL_IMPORT(int, msvcrt, sscanf, (char*, char*, ...));
 MCL_IMPORT(int, msvcrt, sprintf, (char*, const char*, ...));
-MCL_IMPORT(int, msvcrt, vsprintf, (char*, const char*, va_list));
-MCL_IMPORT(int, msvcrt, vsnprintf, (char*, size_t, const char*, va_list));
+MCL_IMPORT(int, msvcrt, vsprintf, (char*, const char*, ...));
+MCL_IMPORT(int, msvcrt, vsnprintf, (char*, size_t, const char*, ...));
 
 int strcasecmp(const char* Left, const char* Right) {
 	int ca, cb;
