@@ -9,6 +9,11 @@ Requires a gcc-based Windows C/C++ compiler (for example, mingw-w64). MSVC is no
 
 If you run into any problems, please report them as GitHub issues.
 
+## Example libraries
+
+* https://github.com/G33kDude/cJson.ahk
+* https://github.com/CloakerSmoker/PDFGen.ahk
+
 ## How to use it
 
 ### From C/C++
