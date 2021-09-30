@@ -137,7 +137,7 @@ class MCL {
 
 		; Oops, I don't know any other naming schemes. Ah well, this is good enough to autodected mingw-w64 installed through cygwin.
 
-		Throw Exception("MCL could find gcc and g++, please manually specify the path both can be found at via 'MCL.CompilerPrefix'")
+		Throw Exception("MCL couldn't find gcc and g++, please manually specify the path both can be found at via 'MCL.CompilerPrefix'")
 	}
 
 	Compile(Compiler, Code, ExtraOptions := "", Bitness := 0) {
