@@ -106,6 +106,16 @@ class MCLTests {
             pResultString := DllCall(Code.Check, "Int", ThePassword, "CDecl Ptr")
             Yuint.Assert(StrGet(pResultString, "UTF-8") = "Oops, that's wrong")
         }
+
+        ImplicitExport() {
+            pCode := MCL.FromC(Read("ImplicitExport.c"))
+
+            Result := DllCall(pCode, "Int", 2, "Int", 9, "Int")
+            Yuint.Assert(Result = 0x400)
+
+            Result := DllCall(pCode, "Int", 0x10, "Int", 13, "Int")
+            Yuint.Assert(Result = 0x20000)
+        }
     }
 
     class CPP {

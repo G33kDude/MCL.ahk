@@ -199,10 +199,30 @@ class MCL {
 
 		TextSection := Linker.SectionsByName[".text"]
 
+		NonExportedFunctions := []
+		SingleFunction := false
+		ExportCount := 0
+
+		static COFF_SYMBOL_TYPE_FUNCTION := 0x20
+
 		for SymbolName, Symbol in Linker.SymbolsByName {
 			if (SymbolName = "__main" || RegExMatch(SymbolName, "O)^__MCL_e_(\w+)")) {
 				Linker.MergeSections(TextSection, Symbol.Section)
+				ExportCount++
 			}
+			else if (Symbol.Type = COFF_SYMBOL_TYPE_FUNCTION) {
+				NonExportedFunctions.Push(Symbol)
+			}
+		}
+
+		if (ExportCount = 0 && NonExportedFunctions.Count() = 1) {
+			; Special case for compatibility with old mcode, if there's only one function defined (and none exported)
+			;  then we'll help out and turn that function into `__main` (like old mcode expects) and return
+			;   a pointer directly to it in `.Load` which should make things easier to port
+
+			SingleFunction := NonExportedFunctions[1]
+
+			Linker.MergeSections(TextSection, SingleFunction.Section)
 		}
 
 		Linker.MakeSectionStandalone(TextSection)
@@ -210,6 +230,10 @@ class MCL {
 
 		Imports := {}
 		Exports := {}
+
+		if (IsObject(SingleFunction)) {
+			Exports[SingleFunction.Name] := SingleFunction.Value
+		}
 
 		for SymbolName, Symbol in TextSection.SymbolsByName {
 			if (SymbolName = "__main" || RegExMatch(SymbolName, "O)^__MCL_(e|i)_([\w\$]+)", Match)) {
@@ -299,8 +323,11 @@ class MCL {
 		if !DllCall("VirtualProtect", "Ptr", pCode, "Ptr", CodeSize, "UInt", 0x40, "UInt*", OldProtect, "UInt")
 			Throw Exception("Failed to mark MCL memory as executable")
 
-		if (Exports.Count() = 1 && Exports.HasKey("__main")) {
-			return Exports["__main"]
+		if (Exports.Count() = 1) {
+			for k, v in Exports {
+				; yeah, it is either this or `._NewEnum()` garbage.
+				return v
+			}
 		}
 		else {
 			return Exports
@@ -398,8 +425,11 @@ class MCL {
 			Base64 := SubStr(Base64, (120-8)+1)
 		}
 		
-		if (Exports.Count() = 1 && Exports.HasKey("__main")) {
-			MainOffset := Exports["__main"]
+		if (Exports.Count() = 1) {
+			for k, v in Exports {
+				; As with `.Load`, either this or `._NewEnum()` fiddling.
+				MainOffset := v
+			}
 
 			Exports := {}
 		}
