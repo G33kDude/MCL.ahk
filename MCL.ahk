@@ -465,7 +465,7 @@ class MCL {
 	}
 
 	AHKFromLanguage(Compiler, Code, Options, CompilerOptions := "") {
-		Literal := Options & this.Options.FormatAsStringLiteral
+		Literal := !(Options & this.Options.DoNotFormat)
 
 		Result := (Literal ? """" : "") "V0.3|"
 

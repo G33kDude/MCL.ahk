@@ -116,6 +116,14 @@ class MCLTests {
             Result := DllCall(pCode, "Int", 0x10, "Int", 13, "Int")
             Yuint.Assert(Result = 0x20000)
         }
+
+        AHKFromIsFormattedCorrectly() {
+            CodeString := MCL.AHKFromC("int __main() {return 20;}", MCL.Options.DoNotFormat)
+            pCode := MCL.FromString(CodeString)
+
+            Result := DllCall(pCode, "Int")
+            Yuint.Assert(Result = 20)
+        }
     }
 
     class CPP {
