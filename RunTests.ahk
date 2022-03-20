@@ -117,6 +117,20 @@ class MCLTests {
             Yuint.Assert(Result = 0x20000)
         }
 
+        ImplicitAllocateMemoryAndWriteString() {
+            ; The big difference between this test and the last one is that this one also pulls in the stdlib
+            ;  headers, which define a bunch of (static) functions of their own. If static functions aren't
+            ;   handled correctly then the main function can't be guessed and this test will fail.
+            ; The proper behavior is that static functions aren't considered when trying to guess which function is
+            ;  the real main function.
+
+            pCode := MCL.FromC(Read("ImplicitAllocateMemoryAndWriteString.c"))
+
+            pResult := DllCall(pCode, "CDecl Ptr")
+
+            Yunit.Assert(StrGet(pResult, "UTF-8") == "ABCDEFGHIJKLMNOPQRSTUVWXYZ", "C code generated incorrect string '" StrGet(pResult, "UTF-8") "'")
+        }
+
         AHKFromIsFormattedCorrectly() {
             CodeString := MCL.AHKFromC("int __main() {return 20;}", MCL.Options.DoNotFormat)
             pCode := MCL.FromString(CodeString)

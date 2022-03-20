@@ -22,13 +22,13 @@ struct tm {
 
 MCL_IMPORT(int, msvcrt, _localtime32_s, (struct tm*, const time_t*));
 
-struct tm* localtime_r(const time_t* Time, struct tm* Output) {
+static struct tm* localtime_r(const time_t* Time, struct tm* Output) {
 	_localtime32_s(Output, Time);
 
 	return Output;
 }
 
-struct tm* localtime(const time_t* Time) {
+static struct tm* localtime(const time_t* Time) {
 	struct tm* Result = malloc(sizeof(struct tm));
 
 	return localtime_r(Time, Result);

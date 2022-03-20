@@ -22,7 +22,7 @@ MCL_IMPORT(int, msvcrt, sprintf, (char*, const char*, ...));
 MCL_IMPORT(int, msvcrt, vsprintf, (char*, const char*, ...));
 MCL_IMPORT(int, msvcrt, vsnprintf, (char*, size_t, const char*, ...));
 
-int strcasecmp(const char* Left, const char* Right) {
+static int strcasecmp(const char* Left, const char* Right) {
 	int ca, cb;
 
 	do {

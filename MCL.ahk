@@ -204,13 +204,14 @@ class MCL {
 		ExportCount := 0
 
 		static COFF_SYMBOL_TYPE_FUNCTION := 0x20
+		static COFF_SYMBOL_STORAGE_CLASS_STATIC := 0x3
 
 		for SymbolName, Symbol in Linker.SymbolsByName {
 			if (SymbolName = "__main" || RegExMatch(SymbolName, "O)^__MCL_e_(\w+)")) {
 				Linker.MergeSections(TextSection, Symbol.Section)
 				ExportCount++
 			}
-			else if (Symbol.Type = COFF_SYMBOL_TYPE_FUNCTION) {
+			else if (Symbol.Type = COFF_SYMBOL_TYPE_FUNCTION && Symbol.StorageClass != COFF_SYMBOL_STORAGE_CLASS_STATIC) {
 				NonExportedFunctions.Push(Symbol)
 			}
 		}

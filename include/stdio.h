@@ -31,7 +31,7 @@ struct stat {
 
 #define fileno(f) ((uint_t)f)
 
-int fstat(uint_t FileHandle, struct stat* Output) {
+static int fstat(uint_t FileHandle, struct stat* Output) {
 	FILE* f = (FILE*)FileHandle;
 
 	int OldPosition = ftell(f);
