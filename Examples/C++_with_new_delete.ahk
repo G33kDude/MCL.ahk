@@ -1,8 +1,8 @@
 #Include %A_ScriptDir%/../
 #include MCL.ahk
 
-CPP = 
-( %
+CPP := "
+(
 
 #include <stdlib.h>
 
@@ -22,10 +22,10 @@ Point* __main(int X, int Y) {
 	return new Point(X, Y);
 }
 
-)
+)"
 
 pCode := MCL.FromCPP(CPP)
 
 pPoint := DllCall(pCode, "Int", 20, "Int", 30, "Ptr")
 
-MsgBox, % NumGet(pPoint+0, 0, "Int") ", " NumGet(pPoint+0, 4, "Int")
+MsgBox NumGet(pPoint, 0, "Int") ", " NumGet(pPoint, 4, "Int")

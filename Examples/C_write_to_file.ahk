@@ -1,8 +1,8 @@
 #Include %A_ScriptDir%/../
 #include MCL.ahk
 
-C =
-( %
+C := "
+(
 
 #include <stdio.h>
 
@@ -15,7 +15,7 @@ void __main(int Value) {
     fclose(f);
 }
 
-)
+)"
 
 pCode := MCL.FromC(C)
 

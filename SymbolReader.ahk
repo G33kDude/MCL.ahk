@@ -3,19 +3,23 @@ class SymbolReaderBase {
 		this.pData := pFileData
 		this.Size := Length
 	}
-	
-	ReadString(Offset, Length := -1) {
-		if (Length > 0) {
+
+	/**
+	 * Read a UTF-8 string from the given offset
+	 * @param {Integer} Offset The offset to read from
+	 * @param {Length}  Length The maximum numbers of characters to read
+	 * @return {String} The read string
+	 */
+	ReadString(Offset, Length := unset) {
+		if IsSet(Length)
 			return StrGet(this.pData + Offset, Length, "UTF-8")
-		}
-		else {
+		else
 			return StrGet(this.pData + Offset, "UTF-8")
-		}
 	}
-	
-	__Call(MethodName, Params*) {
-		if (RegexMatch(MethodName, "O)Read(\w+)", Read) && Read[1] != "String") {
-			return NumGet(this.pData + 0, Params[1], Read[1])
+
+	__Call(MethodName, Params) {
+		if (RegexMatch(MethodName, "Read(\w+)", &Read) && Read[1] != "String") {
+			return NumGet(this.pData, Params[1], Read[1])
 		}
 	}
 }
@@ -23,73 +27,75 @@ class SymbolReaderBase {
 class PESymbolReader extends SymbolReaderBase {
 	ReadSectionHeader(HeaderOffset) {
 		Result := {}
-		
-		Result.Name            := this.ReadString(HeaderOffset, 8)
-		Result.VirtualSize     :=   this.ReadUInt(HeaderOffset + 8)
-		Result.VirtualAddress  :=   this.ReadUInt(HeaderOffset + 12)
-		Result.FileSize        :=   this.ReadUInt(HeaderOffset + 16)
-		Result.FileOffset      :=   this.ReadUInt(HeaderOffset + 20)
-		Result.Characteristics :=   this.ReadUInt(HeaderOffset + 36)
-		
+
+		Result.Name := this.ReadString(HeaderOffset, 8)
+		Result.VirtualSize := this.ReadUInt(HeaderOffset + 8)
+		Result.VirtualAddress := this.ReadUInt(HeaderOffset + 12)
+		Result.FileSize := this.ReadUInt(HeaderOffset + 16)
+		Result.FileOffset := this.ReadUInt(HeaderOffset + 20)
+		Result.Characteristics := this.ReadUInt(HeaderOffset + 36)
+
 		return Result
 	}
 
 	ReadSymbolHeader(SymbolNamesOffset, HeaderOffset) {
 		Result := {}
-		
-		if (this.ReadUInt(HeaderOffset) != 0) {
+
+		if (this.ReadUInt(HeaderOffset) != 0)
 			Result.Name := this.ReadString(HeaderOffset, 8)
-		}
-		else {
+		else
 			Result.Name := this.ReadString(SymbolNamesOffset + this.ReadUInt(HeaderOffset + 4))
-		}
-		
-		Result.Value          :=   this.ReadUInt(HeaderOffset + 8)
-		Result.SectionIndex   := this.ReadUShort(HeaderOffset + 12)
-		Result.Type           := this.ReadUShort(HeaderOffset + 14)
-		Result.StorageClass   :=  this.ReadUChar(HeaderOffset + 16)
-		Result.AuxSymbolCount :=  this.ReadUChar(HeaderOffset + 17)
-		
+
+		Result.Value := this.ReadUInt(HeaderOffset + 8)
+		Result.SectionIndex := this.ReadUShort(HeaderOffset + 12)
+		Result.Type := this.ReadUShort(HeaderOffset + 14)
+		Result.StorageClass := this.ReadUChar(HeaderOffset + 16)
+		Result.AuxSymbolCount := this.ReadUChar(HeaderOffset + 17)
+
 		return Result
 	}
-	
+
 	Read() {
 		static SIZEOF_COFF_HEADER := 20
 		static SIZEOF_SECTION_HEADER := 40
 		static SIZEOF_SYMBOL := 18
-		
+
 		if (this.ReadUShort(0) != 0x8664) {
-			throw Exception("Not a valid 64 bit PE object file")
+			throw Error("Not a valid 64 bit PE object file")
 		}
-		
+
 		SectionHeaderCount := this.ReadUShort(2)
 		SizeOfOptionalHeader := this.ReadUShort(16)
-		
+
 		SectionHeaderTableOffset := SIZEOF_COFF_HEADER + SizeOfOptionalHeader
-		
+
 		Sections := []
-		SectionsByName := {}
-		
-		loop, % SectionHeaderCount {
-			Sections.Push(NextSection := this.ReadSectionHeader(SectionHeaderTableOffset + ((A_Index - 1) * SIZEOF_SECTION_HEADER)))
-			
+		SectionsByName := Map()
+
+		loop SectionHeaderCount {
+			NextSection := this.ReadSectionHeader(SectionHeaderTableOffset + ((A_Index - 1) * SIZEOF_SECTION_HEADER))
+
+			Sections.Push(NextSection)
+
 			SectionsByName[NextSection.Name] := NextSection
 		}
 
 		SymbolTableOffset := this.ReadUInt(8)
 		SymbolCount := this.ReadUInt(12)
 		SymbolNamesOffset := SymbolTableOffset + (SymbolCount * SIZEOF_SYMBOL)
-		
+
 		Symbols := []
-		SymbolsByName := {}
-		
+		SymbolsByName := Map()
+
 		SymbolIndex := 0
-		
+
 		while (SymbolIndex < SymbolCount) {
-			Symbols.Push(NextSymbol := this.ReadSymbolHeader(SymbolNamesOffset, SymbolTableOffset + (SymbolIndex * SIZEOF_SYMBOL)))
-			
+			NextSymbol := this.ReadSymbolHeader(SymbolNamesOffset, SymbolTableOffset + (SymbolIndex * SIZEOF_SYMBOL))
+
+			Symbols.Push(NextSymbol)
+
 			SymbolsByName[NextSymbol.Name] := NextSymbol
-			
+
 			SymbolIndex += 1 + NextSymbol.AuxSymbolCount
 		}
 
@@ -111,23 +117,18 @@ class PESymbolReader extends SymbolReaderBase {
 				PageRelocationCount := (this.ReadUInt(RelocationSecton.FileOffset + RelocationsOffset) - 8) / 2
 				RelocationsOffset += 4
 
-				loop, % PageRelocationCount {
+				loop PageRelocationCount {
 					Relocation := this.ReadUShort(RelocationSecton.FileOffset + RelocationsOffset)
 					RelocationsOffset += 2
-
 					RelocationType := (Relocation >> 12) & 0xF
-					RelocationAddress := (RelocationPage + (Relocation & 0xFFF))
+					RelocationAddress := RelocationPage + (Relocation & 0xFFF)
 					RelocationOffset := RelocationAddress - TextSection.VirtualAddress
-
-					if (RelocationOffset < 0 || RelocationOffset > TextSection.FileSize) {
+					if (RelocationOffset < 0 || RelocationOffset > TextSection.FileSize)
 						continue
-					}
-					else if (RelocationType = 0) {
+					else if (RelocationType = 0)
 						continue
-					}
-					else if (RelocationType != 10) {
-						throw Exception("Unknown relocation type '" RelocationType "'")
-					}
+					else if (RelocationType != 10)
+						throw Error("Unknown relocation type '" RelocationType "'")
 
 					Relocations.Push(RelocationOffset)
 
@@ -137,11 +138,17 @@ class PESymbolReader extends SymbolReaderBase {
 
 					OldValue := this.ReadPtr(TextSection.FileOffset + RelocationOffset)
 					OldValue -= TextOffset
-					NumPut(OldValue, this.pData + 0, TextSection.FileOffset + RelocationOffset, "Ptr")
+					NumPut("Ptr", OldValue, this.pData, TextSection.FileOffset + RelocationOffset)
 				}
 			}
 		}
-		
-		return {"AbsoluteSymbols": SymbolsByName, "Symbols": Symbols, "Sections": Sections, "SectionsByName": SectionsByName, "Relocations": Relocations}
+
+		return {
+			AbsoluteSymbols: SymbolsByName,
+			Symbols: Symbols,
+			Sections: Sections,
+			SectionsByName: SectionsByName,
+			Relocations: Relocations
+		}
 	}
 }

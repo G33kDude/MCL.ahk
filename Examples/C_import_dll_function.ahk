@@ -1,8 +1,8 @@
 #Include %A_ScriptDir%/../
 #include MCL.ahk
 
-C =
-( %
+C := "
+(
 
 #include <stdint.h>
 #include <mcl.h>
@@ -14,7 +14,7 @@ int __main() {
 	return 0;
 }
 
-)
+)"
 
 Code := MCL.AHKFromC(C, MCL.Options.DoNotFormat) ; Compile and stringify the code, but don't format it as an AHK string literal (since we're going to load it again momentarily)
 

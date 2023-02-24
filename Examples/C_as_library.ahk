@@ -1,9 +1,8 @@
 #Include %A_ScriptDir%/../
 #include MCL.ahk
 
-C =
-( %
-
+C := "
+(
 #include <MCL.h>
 
 MCL_EXPORT_INLINE(int, Add, (int Left, int Right)) {
@@ -17,13 +16,12 @@ MCL_EXPORT_INLINE(int, Multiply, (int Left, int Right)) {
 int unused() {
     return 20;
 }
-
-)
+)"
 
 Code := MCL.FromC(C)
 
-Added := DllCall(Code.Add, "Int", 300, "Int", -20, "Int")
-MsgBox, % Added
+Added := DllCall(Code['Add'], "Int", 300, "Int", -20, "Int")
+MsgBox Added
 
-Multiplied := DllCall(Code.Multiply, "Int", Added, "Int", 2, "Int")
-MsgBox, % Multiplied
+Multiplied := DllCall(Code['Multiply'], "Int", Added, "Int", 2, "Int")
+MsgBox Multiplied

@@ -1,8 +1,8 @@
 #Include %A_ScriptDir%/../
 #include MCL.ahk
 
-C =
-( %
+C := "
+(
 
 #include <mcl.h>
 
@@ -17,11 +17,11 @@ int __main(int NewValue) {
 	return Result;
 }
 
-)
+)"
 
 Code := MCL.FromC(C)
 
-NumPut(20, Code.SavedValue, 0, "Int")
-MsgBox, % DllCall(Code.__main, "Int", 30, "CDecl Int")
-MsgBox, % DllCall(Code.__main, "Int", 40, "CDecl Int")
-MsgBox, % NumGet(Code.SavedValue, 0, "Int")
+NumPut("Int", 20, Code['SavedValue'])
+MsgBox DllCall(Code['__main'], "Int", 30, "CDecl Int")
+MsgBox DllCall(Code['__main'], "Int", 40, "CDecl Int")
+MsgBox NumGet(Code['SavedValue'], 0, "Int")
