@@ -276,7 +276,7 @@ NextSection := this.ReadSection(SectionHeaderTableOffset, (A_Index - 1))
 		; Note: The relocation list is cloned since we'll be modifying it to remove any relocations resolved
 		;  entirely within this function.
 
-		for k, Relocation in Section.Relocations.Clone() {
+		for k, Relocation in [Section.Relocations*] { ;.Clone() {
 			if (Relocation.Symbol.Section.Name != Section.Name) {
 				; If the data is relocated against a symbol in any other section, we can't resolve it, since
 				;  we don't actually know the offset between the two sections.

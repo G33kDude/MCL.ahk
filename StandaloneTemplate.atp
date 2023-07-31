@@ -1,0 +1,83 @@
+<?
+toArrStr(comArr) {
+	str := "", e := comArr.__Enum()
+	while e(&k, &v)
+		str .= ", " v
+	return "[" SubStr(str, 3) "]"
+}
+imports := toArrStr(ctx.imports)
+relocations := toArrStr(ctx.relocations)
+
+exports := "", e := ctx.exports.__Enum()
+while e(&k, &v)
+	exports .= ", " v.value
+exports := "[" SubStr(exports, 3) "]"
+
+base64 := ctx.base64
+base64Wrapped := '""'
+while StrLen(base64) {
+	base64Wrapped .= '`n. "' SubStr(base64, 1, 120 - 8) '"'
+	base64 := SubStr(base64, (120 - 8) + 1)
+}
+?>
+class <?= ctx.name ?> {
+	static code := Buffer(<?= ctx.codeSize ?>), exports := <?= exports ?>, codeB64 := <?= base64Wrapped ?>
+	static __New() {
+		if (<?= ctx.bitness ?> != A_PtrSize * 8)
+			throw Error("$Name does not support " (A_PtrSize * 8) " bit AHK, please run using <?= ctx.bitness ?> bit AHK")
+
+		; MCL standalone loader https://github.com/G33kDude/MCLib.ahk
+		; Copyright (c) 2023 G33kDude, CloakerSmoker (CC-BY-4.0)
+		; https://creativecommons.org/licenses/by/4.0/
+
+		if !DllCall("Crypt32\CryptStringToBinary", "Str", this.codeB64, "UInt", 0, "UInt", 1, <?
+		?>"Ptr", buf := Buffer(<?= ctx.compressedSize ?>), "UInt*", buf.Size, "Ptr", 0, "Ptr", 0, "UInt")
+			throw Error("Failed to convert MCL b64 to binary")
+
+		if (r := DllCall("ntdll\RtlDecompressBuffer", "UShort", 0x102, "Ptr", this.code, "UInt", <?= ctx.codeSize ?>, <?
+		?>"Ptr", buf, "UInt", buf.Size, "UInt*", &DecompressedSize := 0, "UInt"))
+			throw Error("Error calling RtlDecompressBuffer",, Format("0x{:08x}", r))
+	
+<? if imports != "[]" { ?>
+		for import, offset in <?= imports ?> {
+			if !(hDll := DllCall("GetModuleHandle", "Str", import[1], "Ptr"))
+				throw Error("Could not load dll " import[1] ": " OsError().Message)
+			if !(pFunction := DllCall("GetProcAddress", "Ptr", hDll, "AStr", import[2], "Ptr"))
+				throw Error("Could not find function " import[2] " from " import[1] ".dll: " OsError().Message)
+			
+			NumPut("Ptr", pFunction, this.code, offset)
+		}
+<? } ?>
+
+<? if relocations != "[]" { ?>
+		for k, offset in <?= relocations ?>
+			NumPut("Ptr", NumGet(this.code, offset, "Ptr") + this.code.Ptr, this.code, offset)
+<? } ?>
+
+		if !DllCall("VirtualProtect", "Ptr", this.code, "Ptr", this.code.Size, "UInt", 0x40, "UInt*", &old := 0, "UInt")
+			throw Error("Failed to mark MCL memory as executable")
+	}
+
+<?
+e := ctx.exports.__Enum()
+while e(&name, &data) {
+	if (data.type = "f") { ; function
+		?>
+	static <?= name ?>(<?
+		for v in StrSplit(data.types, "$") {
+			if !(A_Index & 1) {
+				?><?= v ?><?
+			}
+		}
+		?>) =>
+		DllCall(this.code.Ptr + <?= data.value ?><? for v in StrSplit(data.types, "$") { ?>, <?= A_Index & 1 ? '"' v '"' : v ?><? } ?>)<?
+	} else if (data.type = "g") { ; global
+		?>
+	static <?= name ?> {
+		get => NumGet(this.code.Ptr + <?= data.value ?>, "<?= data.types ?>")
+		set => NumPut("<?= data.types ?>", value, this.code.Ptr + <?= data.value ?>)
+	}<?
+	}
+}
+?>
+}

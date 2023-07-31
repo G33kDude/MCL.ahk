@@ -1,71 +1,39 @@
-﻿$Name() {
-	static CodeBase64 := $CodeBase64
-	static Code := false
+﻿class $Name {
+	static code := Buffer($CodeSize), exports := $Exports, codeB64 := $CodeBase64
+	static __New() {
+		if ($Bitness != A_PtrSize * 8)
+			throw Error("$Name does not support " (A_PtrSize * 8) " bit AHK, please run using $Bitness bit AHK")
 
-	if ((A_PtrSize * 8) != $Bitness) {
-		throw Error("$Name does not support " (A_PtrSize * 8) " bit AHK, please run using $Bitness bit AHK")
-	}
+		; MCL standalone loader https://github.com/G33kDude/MCLib.ahk
+		; Copyright (c) 2023 G33kDude, CloakerSmoker (CC-BY-4.0)
+		; https://creativecommons.org/licenses/by/4.0/
 
-	; MCL standalone loader https://github.com/G33kDude/MCLib.ahk
-	; Copyright (c) 2021 G33kDude, CloakerSmoker (CC-BY-4.0)
-	; https://creativecommons.org/licenses/by/4.0/
+		if !DllCall("Crypt32\CryptStringToBinary", "Str", this.codeB64, "UInt", 0, "UInt", 1, "Ptr", buf := Buffer($CompressedSize), "UInt*", $CompressedSize, "Ptr", 0, "Ptr", 0, "UInt")
+			throw Error("Failed to convert MCL b64 to binary")
 
-	if (!Code) {
-		DecompressionBuffer := Buffer($CompressedSize, 0)
-
-		if !DllCall("Crypt32\CryptStringToBinary", "Str", CodeBase64, "UInt", 0, "UInt", 1, "Ptr", DecompressionBuffer, "UInt*", DecompressionBuffer.Size, "Ptr", 0, "Ptr", 0, "UInt")
-			throw Error("Failed to convert MCLib b64 to binary")
-
-		if !(pCode := DllCall("GlobalAlloc", "UInt", 0, "Ptr", $CodeSize, "Ptr"))
-			throw Error("Failed to reserve MCLib memory")
-
-		DecompressedSize := 0
-
-		if (DllCall("ntdll\RtlDecompressBuffer", "UShort", 0x102, "Ptr", pCode, "UInt", $CodeSize, "Ptr", DecompressionBuffer, "UInt", DecompressionBuffer.Size, "UInt*", &DecompressedSize, "UInt"))
+		if (r := DllCall("ntdll\RtlDecompressBuffer", "UShort", 0x102, "Ptr", this.code, "UInt", $CodeSize, "Ptr", buf, "UInt", $CompressedSize, "UInt*", &DecompressedSize := 0, "UInt"))
 			throw Error("Error calling RtlDecompressBuffer",, Format("0x{:08x}", r))
 	
 $HasImports
-		for ImportName, ImportOffset in $Imports {
-			Import := StrSplit(ImportName, "$")
-			
-			hDll := DllCall("GetModuleHandle", "Str", Import[1], "Ptr")
+		for import, offset in $Imports {
 
-			if (ErrorLevel || A_LastError)
-				throw Error("Could not load dll " Import[1] ", ErrorLevel " ErrorLevel ", LastError " Format("{:0x}", A_LastError))
+			if !(hDll := DllCall("GetModuleHandle", "Str", import[1], "Ptr"))
+				throw Error("Could not load dll " import[1] ": " OsError().Message)
+			if !(pFunction := DllCall("GetProcAddress", "Ptr", hDll, "AStr", import[2], "Ptr"))
+				throw Error("Could not find function " import[2] " from " import[1] ".dll: " OsError().Message)
 			
-			pFunction := DllCall("GetProcAddress", "Ptr", hDll, "AStr", Import[2], "Ptr")
-
-			if (ErrorLevel || A_LastError)
-				throw Error("Could not find function " Import[2] " from " Import[1] ".dll, ErrorLevel " ErrorLevel ", LastError " Format("{:0x}", A_LastError))
-			
-			NumPut(pFunction, pCode + 0, ImportOffset, "Ptr")
+			NumPut("Ptr", pFunction, this.code, offset)
 		}
 $HasImports
 
 $HasRelocations
-		for k, Offset in $Relocations {
-			Old := NumGet(pCode, Offset, "Ptr")
-			NumPut("Ptr", Old + pCode, pCode, Offset)
-		}
+		for k, offset in $Relocations
+			NumPut("Ptr", NumGet(this.code, offset, "Ptr") + this.code.Ptr, this.code, offset)
 $HasRelocations
 
-		OldProtect := 0
-
-		if !DllCall("VirtualProtect", "Ptr", pCode, "Ptr", $CodeSize, "UInt", 0x40, "UInt*", &OldProtect, "UInt")
-			Throw Exception("Failed to mark MCLib memory as executable")
-
-$HasExports
-		Exports := Map()
-
-		for ExportName, ExportOffset in $Exports
-			Exports[ExportName] := pCode + ExportOffset
-
-		Code := Exports
-$HasExports
-$HasNoExports
-		Code := pCode + $MainOffset
-$HasNoExports
+		if !DllCall("VirtualProtect", "Ptr", this.code, "Ptr", $CodeSize, "UInt", 0x40, "UInt*", &old := 0, "UInt")
+			throw Error("Failed to mark MCL memory as executable")
 	}
-
-	return Code
+	static Call(params*) => this.__main(params*)
+$Methods
 }
