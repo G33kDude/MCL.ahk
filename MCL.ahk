@@ -404,7 +404,7 @@ class MCL {
             if (data.type = "f") { ; function
                 params := []
                 for k, v in StrSplit(data.types, "$")
-                    (A_Index & 1) ? params.Push(v) : params.Push(unset)
+                    (A_Index & 1) ? params.Push(StrReplace(v, '_', ' ')) : params.Push(unset)
                 library.%name% := ((this, p*) => DllCall(p*)).Bind(unset, data.value, params*)
             }
             if (data.type = "g") { ; global
