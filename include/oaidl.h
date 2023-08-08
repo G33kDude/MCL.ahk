@@ -32,8 +32,10 @@
 #define VT_BSTR 8
 #define VT_DISPATCH 9
 #define VT_BOOL 11
+#define VT_VARIANT 12
 #define VT_UNKNOWN 13
 #define VT_I8 20
+#define VT_BYREF 16384
 
 typedef struct IDispatch IDispatch;
 typedef void *IUnknown;
@@ -237,5 +239,51 @@ typedef struct IDispatch
 {
 	IDispatchVtbl *lpVtbl;
 } IDispatch;
+
+typedef struct IEnumVARIANT IEnumVARIANT;
+
+typedef struct IEnumVARIANTVtbl
+{
+	__stdcall HRESULT(*QueryInterface)
+	(
+		IEnumVARIANT *This,
+		/* [in] */ REFIID riid,
+		/* [out] */ void **ppvObject);
+
+	__stdcall ULONG(*AddRef)
+	(
+		IEnumVARIANT *This);
+
+	__stdcall ULONG(*Release)
+	(
+		IEnumVARIANT *This);
+
+	__stdcall HRESULT(*Next)
+	(
+		IEnumVARIANT *This,
+		/* [in] */ ULONG celt,
+		/* [out] */ VARIANT *rgVar,
+		/* [out] */ ULONG *pCeltFetched);
+
+	__stdcall HRESULT(*Skip)
+	(
+		IEnumVARIANT *This,
+		/* [in] */ ULONG celt);
+
+	__stdcall HRESULT(*Reset)
+	(
+		IEnumVARIANT *This);
+
+	__stdcall HRESULT(*Clone)
+	(
+		IEnumVARIANT *This,
+		/* [out] */ IEnumVARIANT **ppEnum);
+
+} IEnumVARIANTVtbl;
+
+struct IEnumVARIANT
+{
+	IEnumVARIANTVtbl *lpVtbl;
+};
 
 #endif // OAIDL_HEADER
