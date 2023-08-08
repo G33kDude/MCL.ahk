@@ -314,6 +314,7 @@ class MCL {
 
             if RegExMatch(SymbolName, "^__MCL_([ifg])_([\w\$]+?)(?:\$([\w\$]+))?$", &Match) {
                 if (Match[1] = "i") {
+                    RegExMatch(SymbolName, "^__MCL_([ifg])_([\w\$]+)$", &Match)
                     Imports[Match[2]] := Symbol.Value
                     continue
                 }
