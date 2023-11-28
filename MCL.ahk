@@ -1,4 +1,4 @@
-﻿#Requires AutoHotkey v2.0
+#Requires AutoHotkey v2.0
 #Include %A_LineFile%\..\Linker.ahk
 
 /**
@@ -505,7 +505,7 @@ class MCL {
         compressed := MCL.LZ.Compress(code)
         base64 := MCL.Base64.Encode(compressed)
 
-        template := FileRead(A_LineFile "/../StandaloneTemplate.atp")
+        template := FileRead(A_LineFile "/../StandaloneTemplate_AsFunc.atp")
         template := RunTemplate(template, {
             name: Name,
             base64: base64,

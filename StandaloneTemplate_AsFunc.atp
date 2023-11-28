@@ -1,0 +1,109 @@
+<?
+
+imports := ""
+for k, v in ctx.imports {
+	parts := StrSplit(k, '$')
+	imports .= ", ['" parts[1] "', '" parts[2] "'], " v
+}
+imports := "Map(" SubStr(imports, 3) ")"
+
+relocations := ""
+for k, v in ctx.relocations
+	relocations .= ", " v
+relocations := "[" SubStr(relocations, 3) "]"
+
+exports := ""
+for k, v in ctx.exports
+	exports .= ", " v.value
+exports := "[" SubStr(exports, 3) "]"
+
+base64 := ctx.base64
+base64Wrapped := '""'
+while StrLen(base64) {
+	base64Wrapped .= '`n. "' SubStr(base64, 1, 120 - 8) '"'
+	base64 := SubStr(base64, (120 - 8) + 1)
+}
+?>
+<?= ctx.name ?>() {
+	static lib, code := Buffer(<?= ctx.codeSize ?>), codeB64 := <?= base64Wrapped ?>
+
+	if (<?= ctx.bitness ?> != A_PtrSize * 8)
+		throw Error("$Name does not support " (A_PtrSize * 8) " bit AHK, please run using <?= ctx.bitness ?> bit AHK")
+
+	; MCL standalone loader https://github.com/G33kDude/MCLib.ahk
+	; Copyright (c) 2023 G33kDude, CloakerSmoker (CC-BY-4.0)
+	; https://creativecommons.org/licenses/by/4.0/
+
+	if IsSet(lib)
+		return lib
+
+	if !DllCall("Crypt32\CryptStringToBinary", "Str", codeB64, "UInt", 0, "UInt", 1, <?
+	?>"Ptr", buf := Buffer(<?= ctx.compressedSize ?>), "UInt*", buf.Size, "Ptr", 0, "Ptr", 0, "UInt")
+		throw Error("Failed to convert MCL b64 to binary")
+
+	if (r := DllCall("ntdll\RtlDecompressBuffer", "UShort", 0x102, "Ptr", code, "UInt", <?= ctx.codeSize ?>, <?
+	?>"Ptr", buf, "UInt", buf.Size, "UInt*", &DecompressedSize := 0, "UInt"))
+		throw Error("Error calling RtlDecompressBuffer",, Format("0x{:08x}", r))
+	
+<? if imports != "[]" { ?>
+	for import, offset in <?= imports ?> {
+		if !(hDll := DllCall("GetModuleHandle", "Str", import[1], "Ptr"))
+			throw Error("Could not load dll " import[1] ": " OsError().Message)
+		if !(pFunction := DllCall("GetProcAddress", "Ptr", hDll, "AStr", import[2], "Ptr"))
+			throw Error("Could not find function " import[2] " from " import[1] ".dll: " OsError().Message)
+		
+		NumPut("Ptr", pFunction, code, offset)
+	}
+<? } ?>
+
+<? if relocations != "[]" { ?>
+	for offset in <?= relocations ?>
+		NumPut("Ptr", NumGet(code, offset, "Ptr") + code.Ptr, code, offset)
+<? } ?>
+
+	if !DllCall("VirtualProtect", "Ptr", code, "Ptr", code.Size, "UInt", 0x40, "UInt*", &old := 0, "UInt")
+		throw Error("Failed to mark MCL memory as executable")
+<?
+function_exports := Map()
+global_exports := Map()
+for name, data in ctx.exports {
+	if (data.type = "f") ; function
+		function_exports[name] := data
+	else if (data.type = "g") ; global
+		global_exports[name] := data
+}
+if !function_exports.Count {
+?>
+	lib := {code: code}
+<? } else { ?>
+	lib := {
+		code: code<?
+for name, data in function_exports {
+	?>,
+	<?= name ?>: (this<?
+		for v in StrSplit(data.types, "$") {
+			if !(A_Index & 1) {
+				?>, <?= v ?><?
+			}
+		}
+	?>) =>
+		DllCall(this.code.Ptr + <?= data.value ?><?
+			for v in StrSplit(data.types, "$") {
+				?>, <?= A_Index & 1 ? '"' StrReplace(v, "_", " ") '"' : v ?><?
+			}
+		?>)<?
+}
+?>
+	}
+<?
+for name, data in global_exports {
+	?>
+	lib.DefineProp("<?= name ?>", {
+		get: (this) => NumGet(this.code.Ptr + <?= data.value ?>, "<?= data.types ?>"),
+		set: (this, value) => NumPut("<?= data.types ?>", value, this.code.Ptr + <?= data.value ?>)
+	})<?
+	}
+}
+?>
+	return lib
+}
