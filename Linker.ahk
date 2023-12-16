@@ -259,9 +259,17 @@ class PEObjectLinker extends LinkerBase {
 		this.SectionsByName := Map()
 
 		loop SectionHeaderCount {
-NextSection := this.ReadSection(SectionHeaderTableOffset, (A_Index - 1))
+			NextSection := this.ReadSection(SectionHeaderTableOffset, (A_Index - 1))
 			this.Sections.Push(NextSection)
 			this.SectionsByName[NextSection.Name] := NextSection
+		}
+		
+		this.UndefinedSymbols := Map()
+		
+		for Name, Symbol in this.SymbolsByName {
+			if (!Symbol.HasOwnProp("Section")) {
+				this.UndefinedSymbols[Name] := Symbol
+			}
 		}
 	}
 
@@ -334,5 +342,15 @@ NextSection := this.ReadSection(SectionHeaderTableOffset, (A_Index - 1))
 
 		for Name, Section in Dependencies
 			this.MergeSections(Target, Section)
+	}
+	
+	ResolveUndefinedSymbolReferences(OnUndefinedSymbolReference) {
+		for Name, Section in this.SectionsByName {
+			for k, Relocation in Section.Relocations {
+				if !Relocation.Symbol.HasOwnProp('Section') {
+					OnUndefinedSymbolReference(Relocation)
+				}
+			}
+		}
 	}
 }

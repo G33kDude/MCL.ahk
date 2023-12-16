@@ -3,8 +3,12 @@
 
 #if MCL_BITNESS == 32
 #define MCL_CALLING_CONVENTION __attribute__((__stdcall__))
+#define MCL_INPUT_RAX "eax"
+#define MCL_JUMP_RAX "jmp *%%eax;"
 #else
 #define MCL_CALLING_CONVENTION
+#define MCL_INPUT_RAX "rax"
+#define MCL_JUMP_RAX "jmp *%%rax;"
 #endif
 
 #define MCL_JOIN1(x, ...) MCL_JOIN2(x##__VA_OPT__($##__VA_ARGS__))
@@ -53,6 +57,12 @@ ReturnType Name Parameters
 #define MCL_IMPORT(ReturnType, DllName, Name, ParameterTypes) \
 ReturnType (* MCL_CALLING_CONVENTION (__MCL_i_ ## DllName ## $ ## Name))ParameterTypes = (ReturnType (MCL_CALLING_CONVENTION *)ParameterTypes)0; \
 static ReturnType __attribute__((alias(MCL_QUOTE(__MCL_i_ ## DllName ## $ ## Name)))) (* MCL_CALLING_CONVENTION Name) ParameterTypes
+
+#define MCL_IMPORT_DECLARED(DllName, Declaration) \
+typedef typeof(Declaration) T_ ## Declaration; \
+T_ ## Declaration* __MCL_i_ ## DllName ## $ ## Declaration = (T_ ## Declaration *)0; \
+static void(*__ ## Declaration)(void) __attribute__((alias(MCL_QUOTE(__MCL_i_ ## DllName ## $ ## Declaration)))); \
+__attribute__ ((naked)) void __MCL_w_ ## Declaration (void) { asm ( MCL_JUMP_RAX : : MCL_INPUT_RAX(__ ## Declaration) ); }
 
 #define main __main
 

@@ -139,10 +139,10 @@ class MCL {
     }
 
     /** @type {String} - A platform-specific prefix to apply to the compiler file name */
-    static CompilerPrefix := "/usr/bin/x86_64-w64-mingw32-"
+    static CompilerPrefix := ""
 
     /** @type {String} - A platform-specific suffix to apply to the compiler file name */
-    static CompilerSuffix := ""
+    static CompilerSuffix := ".exe"
 
     /**
      * Checks if the compilers can be found with the given prefix and suffix.
@@ -236,10 +236,10 @@ class MCL {
                 "-c "
                 "-Os "
             )
-;            exec.StdIn.Close()
+            exec.StdIn.Close()
 
-;            if !exec.StdErr.AtEndOfStream
-;               throw Error(StrReplace(exec.StdErr.ReadAll(), " ", " "), , "Compiler Error")
+            if !exec.StdErr.AtEndOfStream
+               throw Error(StrReplace(exec.StdErr.ReadAll(), " ", " "), , "Compiler Error")
 
             loop
                 Sleep 100
@@ -286,6 +286,24 @@ class MCL {
                 NonExportedFunctions.Push(Symbol)
             }
         }
+		
+		OnUndefinedSymbolReference(Relocation) {
+			Name := Relocation.Symbol.Name
+			
+			;MsgBox('Undefined ' Name)
+			
+			for SymbolName, Symbol in Linker.SymbolsByName {
+				if (Name != SymbolName && InStr(SymbolName, "w_" Name) && InStr(SymbolName, ".text")) {
+					;MsgBox('Mapped ' Name ' => ' SymbolName)
+					Relocation.Symbol := Symbol
+					return
+				}
+			}
+			
+			throw Error("Reference to undefined symbol " Name)
+		}
+		
+		Linker.ResolveUndefinedSymbolReferences(OnUndefinedSymbolReference)
 
         if (ExportCount = 0 && NonExportedFunctions.Length = 1) {
             ; Special case for compatibility with old mcode, if there's only one function defined (and none exported)

@@ -12,6 +12,8 @@ typedef uint64_t off_t;
 
 typedef int64_t int_t;
 typedef uint64_t uint_t;
+
+typedef int64_t __int64;
 #else
 typedef uint32_t size_t;
 typedef int32_t ssize_t;
@@ -21,6 +23,8 @@ typedef uint32_t off_t;
 
 typedef int32_t int_t;
 typedef uint32_t uint_t;
+
+typedef int64_t __int64;
 #endif
 
 #ifndef __cplusplus

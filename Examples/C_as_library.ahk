@@ -20,8 +20,8 @@ int unused() {
 
 Code := MCL.FromC(C)
 
-Added := DllCall(Code['Add'], "Int", 300, "Int", -20, "Int")
+Added := Code.Add("Int", 300, "Int", -20, "Int")
 MsgBox Added
 
-Multiplied := DllCall(Code['Multiply'], "Int", Added, "Int", 2, "Int")
+Multiplied := Code.Multiply("Int", Added, "Int", 2, "Int")
 MsgBox Multiplied
