@@ -58,11 +58,17 @@ ReturnType Name Parameters
 ReturnType (* MCL_CALLING_CONVENTION (__MCL_i_ ## DllName ## $ ## Name))ParameterTypes = (ReturnType (MCL_CALLING_CONVENTION *)ParameterTypes)0; \
 static ReturnType __attribute__((alias(MCL_QUOTE(__MCL_i_ ## DllName ## $ ## Name)))) (* MCL_CALLING_CONVENTION Name) ParameterTypes
 
+#define MCL_IMPORT_FROM(ReturnType, Name, ParameterTypes) \
+MCL_DEFER(MCL_IMPORT, ReturnType, MCL_IMPORT_SOURCE, Name, ParameterTypes)
+
 #define MCL_IMPORT_DECLARED(DllName, Declaration) \
 typedef typeof(Declaration) T_ ## Declaration; \
 T_ ## Declaration* __MCL_i_ ## DllName ## $ ## Declaration = (T_ ## Declaration *)0; \
 static void(*__ ## Declaration)(void) __attribute__((alias(MCL_QUOTE(__MCL_i_ ## DllName ## $ ## Declaration)))); \
 __attribute__ ((naked)) void __MCL_w_ ## Declaration (void) { asm ( MCL_JUMP_RAX : : MCL_INPUT_RAX(__ ## Declaration) ); }
+
+#define MCL_IMPORT_DECLARED_FROM(Declaration) \
+MCL_DEFER(MCL_IMPORT_DECLARED, MCL_IMPORT_SOURCE, Declaration)
 
 #define main __main
 
