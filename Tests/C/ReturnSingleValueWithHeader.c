@@ -1,5 +1,6 @@
 #include <mcl.h>
 
-int __main() {
+MCL_EXPORT(Call, Int)
+int _stdcall Call() {
     return 2390;
 }

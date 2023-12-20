@@ -13,6 +13,6 @@ MyMap Map[] = {
 	{"cat", 900}
 };
 
-MyMap* __main(int Index) {
-	return &Map[Index];
+MyMap* __MCL_f_Call$Int$index$CDecl_Ptr(int index) {
+	return &Map[index];
 }

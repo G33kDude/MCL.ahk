@@ -1,120 +1,115 @@
-#Include %A_ScriptDir%
+#Requires AutoHotkey v2.0
 
 #Include Yunit\Yunit.ahk
 #Include Yunit\Window.ahk
-#Include Yunit\Stdout.ahk
 
 #Include MCL.ahk
 
-Tester := Yunit.Use(YunitStdout, YunitWindow)
-
-Read(File) {
-    return FileOpen(File, "r").Read()
-}
+Tester := Yunit.Use(YunitWindow)
 
 class MCLTests {
     class C {
         Begin() {
-            SetWorkingDir, %A_ScriptDir%/Tests/C
+            SetWorkingDir A_ScriptDir "\Tests\C"
         }
 
         ReturnSingleValue() {
-            pCode := MCL.FromC(Read("ReturnSingleValue.c"))
+            lib := MCL.FromC(FileRead("ReturnSingleValue.c"))
 
-            Result := DllCall(pCode, "CDecl Int")
-            Yunit.Assert(Result == 2390)
+            result := lib()
+            Yunit.Assert(result == 2390)
         }
 
         ManualFunctionImport() {
-            pCode := MCL.FromC(Read("ManualFunctionImport.c"))
+            lib := MCL.FromC(FileRead("ManualFunctionImport.c"))
 
-            Result := DllCall(pCode, "WStr", "2390", "CDecl Int")
-            Yunit.Assert(Result == 2390)
+            result := lib("2390")
+            Yunit.Assert(result == 2390)
         }
 
         PassLotsOfParameters() {
-            pCode := MCL.FromC(Read("PassLotsOfParameters.c"))
+            lib := MCL.FromC(FileRead("PassLotsOfParameters.c"))
 
-            Result := DllCall(pCode, "Int", 2000, "Int", 150, "Int", 150, "Int", 60, "Int", 30, "CDecl Int")
-            Yunit.Assert(Result == 2390)
+            result := lib(2000, 150, 150, 60, 30)
+            Yunit.Assert(result == 2390)
 
-            Result := DllCall(pCode, "Int", 1000, "Int", 1000, "Int", 1000, "Int", 1000, "Int", 1000, "CDecl Int")
-            Yunit.Assert(Result == 5000)
+            result := lib(1000, 1000, 1000, 1000, 1000)
+            Yunit.Assert(result == 5000)
         }
 
         BasicFloatMath() {
-            pCode := MCL.FromC(Read("BasicFloatMath.c"))
+            lib := MCL.FromC(FileRead("BasicFloatMath.c"))
 
-            Result := DllCall(pCode, "Double", 3.1, "Double", 2.8, "CDecl Double")
+            Result := lib(3.1, 2.8)
             Yunit.Assert(Abs(Result - 12.98) < 0.0001)
         }
 
         ReturnSingleValueWithHeader() {
-            pCode := MCL.FromC(Read("ReturnSingleValueWithHeader.c"))
+            lib := MCL.FromC(FileRead("ReturnSingleValueWithHeader.c"))
 
-            Result := DllCall(pCode, "CDecl Int")
-            Yunit.Assert(Result == 2390)
+            result := lib()
+            Yunit.Assert(result == 2390)
         }
 
         AllocateMemoryAndWriteString() {
-            pCode := MCL.FromC(Read("AllocateMemoryAndWriteString.c"))
+            lib := MCL.FromC(FileRead("AllocateMemoryAndWriteString.c"))
 
-            pResult := DllCall(pCode, "CDecl Ptr")
+            pResult := lib()
 
-            Yunit.Assert(StrGet(pResult, "UTF-8") == "ABCDEFGHIJKLMNOPQRSTUVWXYZ", "C code generated incorrect string '" StrGet(pResult, "UTF-8") "'")
+            Yunit.Assert(
+                StrGet(pResult, "UTF-8") == "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+                "C code generated incorrect string '" StrGet(pResult, "UTF-8") "'"
+            )
         }
 
         Library() {
-            Library := MCL.FromC(Read("Library.c"))
+            lib := MCL.FromC(FileRead("Library.c"))
 
-            Yunit.Assert(IsObject(Library))
+            Yunit.Assert(IsObject(lib))
 
-            TestString := "ABC|DEF"
+            testString := "ABC|DEF"
 
-            PipePosition := DllCall(Library.Find, "AStr", TestString, "Int", Chr("|"), "CDecl Int")
-            Yuint.Assert(PipePosition == 3)
+            pipePosition := lib.Find(testString, Ord("|"))
+            Yunit.Assert(PipePosition == 3)
 
-            ReferenceHash := DllCall(Library.Hash, "AStr", "DEF", "CDecl Int")
-            ActualHash := DllCall(Library.Hash, "AStr", SubStr(TestString, PipePosition), "CDecl Int")
-            
-            Yuint.Assert(ReferenceHash == ActualHash)
+            referenceHash := lib.Hash("DEF")
+            actualHash := lib.Hash(SubStr(testString, 1 + pipePosition + 1))
+
+            Yunit.Assert(referenceHash == actualHash)
         }
 
         Relocations() {
-            pCode := MCL.FromC(Read("Relocations.c"))
+            lib := MCL.FromC(FileRead("Relocations.c"))
 
-            for k, String in ["Hello", "Goodbye", "dog", "cat"] {
-                pEntry := DllCall(pCode, "Int", k - 1, "CDecl Ptr")
+            for string in ["Hello", "Goodbye", "dog", "cat"] {
+                pEntry := lib(A_Index - 1)
 
-                pString := NumGet(pEntry + 0, 0, "Ptr")
+                pString := NumGet(pEntry, 0, "Ptr")
 
-                Yunit.Assert(StrGet(pString, "UTF-8") = String)
+                Yunit.Assert(StrGet(pString, "UTF-8") == string)
             }
         }
 
         GetSetGlobal() {
-            Code := MCL.FromC(Read("GetSetGlobalFromAHK.c"))
+            lib := MCL.FromC(FileRead("GetSetGlobalFromAHK.c"))
 
-            pResultString := DllCall(Code.Check, "Int", 20, "CDecl Ptr")
-            Yuint.Assert(StrGet(pResultString, "UTF-8") = "Oops, that's wrong")
+            result := lib.Check(20)
+            Yunit.Assert(result == "Oops, that's wrong")
 
-            ThePassword := NumGet(Code.Password, 0, "Int")
-            pResultString := DllCall(Code.Check, "Int", ThePassword, "CDecl Ptr")
-            Yuint.Assert(StrGet(pResultString, "UTF-8") = "You got the password right!")
+            result := lib.Check(lib.Password)
+            Yunit.Assert(result == "You got the password right!")
 
-            NumPut(0, Code.Password, 0, "Int")
-            pResultString := DllCall(Code.Check, "Int", ThePassword, "CDecl Ptr")
-            Yuint.Assert(StrGet(pResultString, "UTF-8") = "Oops, that's wrong")
+            oldPassword := lib.Password
+            lib.Password := 0
+            result := lib.Check(oldPassword)
+            Yunit.Assert(result == "Oops, that's wrong")
         }
 
         ImplicitExport() {
-            pCode := MCL.FromC(Read("ImplicitExport.c"))
+            lib := MCL.FromC(FileRead("ImplicitExport.c"))
 
-            Result := DllCall(pCode, "Int", 2, "Int", 9, "Int")
-            Yuint.Assert(Result = 0x400)
-
-            Result := DllCall(pCode, "Int", 0x10, "Int", 13, "Int")
-            Yuint.Assert(Result = 0x20000)
+            ; No longer supported
+            Yunit.Assert(False)
         }
 
         ImplicitAllocateMemoryAndWriteString() {
@@ -124,42 +119,39 @@ class MCLTests {
             ; The proper behavior is that static functions aren't considered when trying to guess which function is
             ;  the real main function.
 
-            pCode := MCL.FromC(Read("ImplicitAllocateMemoryAndWriteString.c"))
-
-            pResult := DllCall(pCode, "CDecl Ptr")
-
-            Yunit.Assert(StrGet(pResult, "UTF-8") == "ABCDEFGHIJKLMNOPQRSTUVWXYZ", "C code generated incorrect string '" StrGet(pResult, "UTF-8") "'")
+            ; No longer supported
+            Yunit.Assert(False)
         }
 
         AHKFromIsFormattedCorrectly() {
             CodeString := MCL.AHKFromC("int __main() {return 20;}", MCL.Options.DoNotFormat)
-            pCode := MCL.FromString(CodeString)
+            lib := MCL.FromString(CodeString)
 
-            Result := DllCall(pCode, "Int")
-            Yuint.Assert(Result = 20)
+            Result := lib()
+            Yunit.Assert(Result == 20)
         }
     }
 
     class CPP {
         Begin() {
-            SetWorkingDir, %A_ScriptDir%/Tests/CPP
+            SetWorkingDir A_ScriptDir "\Tests\CPP"
         }
 
         New() {
-            pCode := MCL.FromCPP(Read("New.cpp"))
+            lib := MCL.FromCPP(FileRead("New.cpp"))
 
-            pPoint := DllCall(pCode, "Int", 20, "Int", 30, "CDecl Ptr")
+            pPoint := lib(20, 30)
 
-            Yunit.Assert(NumGet(pPoint+0, 0, "Int") = 20)
-            Yunit.Assert(NumGet(pPoint+0, 4, "Int") = 30)
+            Yunit.Assert(NumGet(pPoint, 0, "Int") == 20)
+            Yunit.Assert(NumGet(pPoint, 4, "Int") == 30)
         }
 
         Spooky() {
-            pCode := MCL.FromCPP(Read("Spooky.cpp"))
+            lib := MCL.FromCPP(FileRead("Spooky.cpp"))
 
-            Success := DllCall(pCode, "CDecl Int")
+            success := lib()
 
-            Yunit.Assert(Success = -1)
+            Yunit.Assert(success == -1)
         }
     }
 

@@ -1,6 +1,6 @@
 #include <stdlib.h>
 
-char* __main() {
+char* _stdcall __MCL_f_Call$Ptr() {
     char* Memory = malloc(27);
 
     char NextCharacter = 'A';

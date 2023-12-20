@@ -1,24 +1,20 @@
 #include <mcl.h>
 
-int Find(char* String, char Target) {
-    for (int Index = 0; String[Index] != 0; Index++) {
-        if (String[Index] == Target) {
-            return Index;
-        }
-    }
-
+MCL_EXPORT(Find, AStr, string, Char, target, CDecl_Int)
+int Find(char* string, char target) {
+    for (int index = 0; string[index] != 0; index++)
+        if (string[index] == target)
+            return index;
     return -1;
 }
 
-MCL_EXPORT(Find)
-
-MCL_EXPORT_INLINE(unsigned long int, Hash, (char* String)) {
-    unsigned long int Hash = 5381;
+MCL_EXPORT_INLINE(unsigned int, Hash, (char* string), AStr, string, CDecl_UInt) {
+    unsigned int hash = 5381;
     
-    for (int Index = 0; String[Index] != 0; Index++) {
-        char Next = String[Index];
-        Hash = ((Hash << 5) + Hash) + Next; 
+    for (int index = 0; string[index] != 0; index++) {
+        char next = string[index];
+        hash = ((hash << 5) + hash) + next; 
     }
 
-    return Hash;
+    return hash;
 }

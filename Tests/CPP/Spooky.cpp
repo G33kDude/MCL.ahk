@@ -1,4 +1,7 @@
+#include <mcl.h>
 #include <stdlib.h>
+
+MCL_EXPORT(Call, CDecl_Int)
 
 #if MCL_BITNESS == 64
 
@@ -38,7 +41,7 @@ private:
 };
 
 #define BUFSIZE (512)
-int __main()
+int Call()
 {
     static const uint64 expected[BUFSIZE] = {
       0x6bf50919,0x70de1d26,0xa2b37298,0x35bc5fbf,0x8223b279,0x5bcb315e,0x53fe88a1,0xf9f1a233,
@@ -131,7 +134,7 @@ int __main()
 #else // MCL_BITNESS == 64
 // SpookyHash doesn't support 32 bit
 
-int __main() {
+int Call() {
     return -1;
 }
 
