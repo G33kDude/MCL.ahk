@@ -1,22 +1,23 @@
-#Include %A_ScriptDir%/../
-#include MCL.ahk
+#Requires AutoHotkey v2.0
 
-C := "
+#Include ..\MCL.ahk
+
+lib := MCL.FromC("
 (
-
+#include <mcl.h>
 #include <stdio.h>
 
-void __main(int Value) {
-	FILE* f = fopen("test.txt", "w");
+MCL_EXPORT(Call, Int, value)
+void Call(int value) {
+    FILE* f = fopen("test.txt", "w");
 
     fputs("Hello world!\n", f);
-    fprintf(f, "The number is: %i\n", Value);
+    fprintf(f, "The number is: %i\n", value);
 
     fclose(f);
 }
+)")
 
-)"
+lib(2931)
 
-pCode := MCL.FromC(C)
-
-DllCall(pCode, "Int", 2931)
+MsgBox FileRead("test.txt")

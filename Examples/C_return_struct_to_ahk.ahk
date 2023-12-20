@@ -1,9 +1,10 @@
-#Include %A_ScriptDir%/../
-#include MCL.ahk
+#Requires AutoHotkey v2.0
 
-C := "
+#Include ..\MCL.ahk
+
+lib := MCL.FromC("
 (
-
+#include <mcl.h>
 #include <stdlib.h>
 
 typedef struct {
@@ -11,7 +12,8 @@ typedef struct {
 	int Y;
 } Point;
 
-Point* __main(int a, int b) {
+MCL_EXPORT(Call, Int, a, Int, b, Ptr)
+Point* Call(int a, int b) {
 	Point* P = malloc(sizeof(Point));
 	
 	P->X = a;
@@ -19,13 +21,8 @@ Point* __main(int a, int b) {
 	
 	return P;
 }
+)")
 
-)"
-
-Code := MCL.AHKFromC(C, MCL.Options.DoNotFormat) ; Compile and stringify the code, but don't format it as an AHK string literal (since we're going to load it again momentarily)
-
-pCode := MCL.FromString(Code)
-
-pPoint := DllCall(pCode, "Int", 20, "Int", 30, "CDecl Ptr")
+pPoint := lib(20, 30)
 
 MsgBox NumGet(pPoint, 0, "Int") ", " NumGet(pPoint, 4, "Int")

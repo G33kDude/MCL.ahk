@@ -1,27 +1,28 @@
-#Include %A_ScriptDir%/../
-#include MCL.ahk
+#Requires AutoHotkey v2.0
 
-C := "
+#Include ../MCL.ahk
+
+lib := MCL.FromC("
 (
-#include <MCL.h>
+#include <mcl.h>
 
-MCL_EXPORT_INLINE(int, Add, (int Left, int Right)) {
-    return Left + Right;
+MCL_EXPORT(Add, Int, left, Int, right, Int)
+int Add(int left, int right) {
+    return left + right;
 }
 
-MCL_EXPORT_INLINE(int, Multiply, (int Left, int Right)) {
-    return Left * Right;
+MCL_EXPORT(Multiply, Int, left, Int, right, Int)
+int Multiply(int left, int right) {
+    return left * right;
 }
 
 int unused() {
     return 20;
 }
-)"
+)")
 
-Code := MCL.FromC(C)
+added := lib.Add(300, -20)
+MsgBox added
 
-Added := Code.Add("Int", 300, "Int", -20, "Int")
-MsgBox Added
-
-Multiplied := Code.Multiply("Int", Added, "Int", 2, "Int")
-MsgBox Multiplied
+multiplied := lib.Multiply(Added, 2)
+MsgBox multiplied

@@ -1,15 +1,15 @@
-#Include %A_ScriptDir%/../
-#include MCL.ahk
+#Requires AutoHotkey v2.0
 
-C := "
+#Include ..\MCL.ahk
+
+lib := MCL.FromC("
 (
+#include <mcl.h>
 
-double __main(double In) {
-	return In * 2.5;
+MCL_EXPORT(Call, Double, in, Double)
+double Call(double in) {
+	return in * 2.5;
 }
+)")
 
-)"
-
-pCode := MCL.FromC(C)
-
-MsgBox DllCall(pCode, "Double", 11.7, "Double")
+MsgBox lib(11.7)

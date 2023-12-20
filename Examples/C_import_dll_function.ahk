@@ -1,23 +1,19 @@
-#Include %A_ScriptDir%/../
-#include MCL.ahk
+#Requires AutoHotkey v2.0
 
-C := "
+#Include ..\MCL.ahk
+
+lib := MCL.FromC("
 (
-
-#include <stdint.h>
 #include <mcl.h>
+#include <stdint.h>
 
 MCL_IMPORT(int, User32, MessageBoxA, (uint32_t, char*, char*, uint32_t));
 
-int __main() {
+MCL_EXPORT(Call, Int)
+int Call() {
 	MessageBoxA(0, "Hello world from C!", "Wow", 0);
 	return 0;
 }
+)")
 
-)"
-
-Code := MCL.AHKFromC(C, MCL.Options.DoNotFormat) ; Compile and stringify the code, but don't format it as an AHK string literal (since we're going to load it again momentarily)
-
-pCode := MCL.FromString(Code)
-
-DllCall(pCode)
+lib()

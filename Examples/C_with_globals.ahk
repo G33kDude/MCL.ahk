@@ -1,24 +1,24 @@
-#Include %A_ScriptDir%/../
-#include MCL.ahk
+#Requires AutoHotkey v2.0
 
-C := "
+#Include ..\MCL.ahk
+
+lib := MCL.FromC("
 (
+#include <mcl.h>
 
-int SavedValue = 10;
+int savedValue = 10;
 
-int __main(int NewValue) {
-	int Result = SavedValue;
+MCL_EXPORT(Call, Int, newValue, Int)
+int Call(int newValue) {
+	int result = savedValue;
 	
-	SavedValue = NewValue;
+	savedValue = newValue;
 	
-	return Result;
+	return result;
 }
+)")
 
-)"
-
-pCode := MCL.FromC(C)
-
-MsgBox DllCall(pCode, "Int", 20, "Ptr")
-MsgBox DllCall(pCode, "Int", 30, "Ptr")
-MsgBox DllCall(pCode, "Int", 40, "Ptr")
-MsgBox DllCall(pCode, "Int", 50, "Ptr")
+MsgBox lib(20)
+MsgBox lib(30)
+MsgBox lib(40)
+MsgBox lib(50)

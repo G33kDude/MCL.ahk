@@ -1,9 +1,10 @@
-#Include %A_ScriptDir%/../
-#include MCL.ahk
+#Requires AutoHotkey v2.0
 
-CPP := "
+#Include ..\MCL.ahk
+
+lib := MCL.FromCPP("
 (
-
+#include <mcl.h>
 #include <stdlib.h>
 
 class Point {
@@ -18,14 +19,12 @@ private:
 	int Y;
 };
 
-Point* __main(int X, int Y) {
+MCL_EXPORT(Call, Int, x, Int, y, Ptr)
+Point* Call(int X, int Y) {
 	return new Point(X, Y);
 }
+)")
 
-)"
-
-pCode := MCL.FromCPP(CPP)
-
-pPoint := DllCall(pCode, "Int", 20, "Int", 30, "Ptr")
+pPoint := lib(20, 30)
 
 MsgBox NumGet(pPoint, 0, "Int") ", " NumGet(pPoint, 4, "Int")

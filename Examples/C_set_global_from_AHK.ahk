@@ -1,27 +1,23 @@
-#Include %A_ScriptDir%/../
-#include MCL.ahk
+#Requires AutoHotkey v2.0
 
-C := "
+#Include ..\MCL.ahk
+
+lib := MCL.FromC("
 (
-
 #include <mcl.h>
 
-int SavedValue = 10;
-MCL_EXPORT_GLOBAL(SavedValue);
+MCL_EXPORT_GLOBAL(savedValue, Int)
+int savedValue = 10;
 
-int __main(int NewValue) {
-	int Result = SavedValue;
-	
-	SavedValue = NewValue;
-	
-	return Result;
+MCL_EXPORT(Call, Int, newValue, Int)
+int Call(int newValue) {
+	int result = savedValue;
+	savedValue = newValue;
+	return result;
 }
+)")
 
-)"
-
-Code := MCL.FromC(C)
-
-NumPut("Int", 20, Code['SavedValue'])
-MsgBox DllCall(Code['__main'], "Int", 30, "CDecl Int")
-MsgBox DllCall(Code['__main'], "Int", 40, "CDecl Int")
-MsgBox NumGet(Code['SavedValue'], 0, "Int")
+lib.savedValue := 20
+MsgBox lib(30)
+MsgBox lib(40)
+MsgBox lib.savedValue
