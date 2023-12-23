@@ -288,8 +288,6 @@ class MCL {
 
         try {
             FileOpen(inputFile, "w").Write(code)
-            while !FileExist(inputFile)
-                Sleep 100
 
             DirCopy A_LineFile "/../include", includeFolder
 
