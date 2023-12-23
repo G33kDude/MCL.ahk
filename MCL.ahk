@@ -5,6 +5,121 @@
  * MCL
  */
 class MCL {
+    /** All the data needed to load machine code into a running script */
+    class CompiledCode {
+        /** @prop {Buffer} code The code */
+        code := unset
+
+        /** @prop {Map<String, MCL.Import>} imports Imports */
+        imports := unset
+
+        /** @prop {Map<String, MCL.Export>} exports Exports */
+        exports := unset
+
+        /** @prop {Map<String, Int>} relocations Relocations */
+        relocations := unset
+
+        /** @prop {Int} bitness Bitness */
+        bitness := unset
+    }
+
+    class Export {
+        /**
+         * The name of the export
+         * @type {String}
+         */
+        name := unset
+
+        /**
+         * The offset of this export from the start of the code buffer
+         * @type {Int}
+         */
+        value := unset
+
+        /**
+         * The type of export, such as `f` for function or `g` for global variable
+         * @type {String}
+         */
+        type := unset
+
+        /**
+         * A `$`-delimited list of types associated with the export
+         * @type {String}
+         */
+        types := unset
+    }
+
+    class Import {
+        /**
+         * The name of the import, separated by `$` into DLL name and function name
+         * @type {String}
+         */
+        name := unset
+
+        /**
+         * The offset of this import from the start of the code buffer
+         * @type {Int}
+         */
+        offset := unset
+    }
+
+    class Symbol {
+        /** @type {String} */
+        name := unset
+
+        /** @type {Int} */
+        value := unset
+
+        /** @type {MCL.Section} */
+        section := unset
+
+        /** @type {Int} */
+        storageClass := unset
+
+        /** @type {Int} */
+        auxSymbolCount := unset
+    }
+
+    class Relocation {
+        /** @type {Int} */
+        address := unset
+
+        /** @type {Int} */
+        type := unset
+
+        /** @type {MCL.Symbol} */
+        symbol := unset
+    }
+
+    class Section {
+        /** @type {String} */
+        name := unset
+
+        /** @type {Int} */
+        virtualSize := unset
+
+        /** @type {Int} */
+        virtualAddress := unset
+
+        /** @type {Int} */
+        fileSize := unset
+
+        /** @type {Int} */
+        fileOffset := unset
+
+        /** @type {Int} */
+        relocationsOffset := unset
+
+        /** @type {Int} */
+        relocationCount := unset
+
+        /** @type {Int} */
+        characteristics := unset
+
+        /** @type {PEObjectLinker.Data} */
+        data := unset
+    }
+
     /**
      * LZ Compression
      */
@@ -138,10 +253,16 @@ class MCL {
         return prefix . counter . suffix
     }
 
-    /** @type {String} - A platform-specific prefix to apply to the compiler file name */
+    /**
+     * A platform-specific prefix to apply to the compiler file name 
+     * @prop {String} CompilerPrefix
+     */
     static CompilerPrefix := ""
 
-    /** @type {String} - A platform-specific suffix to apply to the compiler file name */
+    /**
+     * A platform-specific suffix to apply to the compiler file name
+     * @prop {String} CompilerSuffix
+     */
     static CompilerSuffix := ".exe"
 
     /**
@@ -203,7 +324,7 @@ class MCL {
      *     on the command line
      * @param {Integer} [bitness] - The bitness to target (e.g. 32, 64)
      * 
-     * @return {Array} A bunch of stuff
+     * @return {MCL.CompiledCode} A bunch of stuff
      */
     static Compile(compiler, code, extraOptions := "", bitness := A_PtrSize * 8) {
 
@@ -331,170 +452,232 @@ class MCL {
             }
         }
 
-        ; TODO
-        Linker := PEObjectLinker(pe.Ptr, pe.Size)
-        Linker.Read()
+        linker := PEObjectLinker(pe.Ptr, pe.Size)
+        linker.Read()
 
-        TextSection := Linker.SectionsByName[".text"]
+        /** @type {MCL.Section} */
+        textSection := linker.sectionsByName[".text"]
 
-        NonExportedFunctions := []
-        SingleFunction := false
-        ExportCount := 0
+        nonExportedFunctions := []
+
+        /** @type {MCL.Symbol} */
+        singleFunction := unset
+
+        exportCount := 0
 
         static COFF_SYMBOL_TYPE_FUNCTION := 0x20
         static COFF_SYMBOL_STORAGE_CLASS_STATIC := 0x3
 
-        for SymbolName, Symbol in Linker.SymbolsByName {
-            if (SymbolName = "__main" || RegExMatch(SymbolName, "^__MCL_[fg]_(\w+)")) {
-                Linker.MergeSections(TextSection, Symbol.Section)
-                ExportCount++
-            } else if (Symbol.Type = COFF_SYMBOL_TYPE_FUNCTION && Symbol.StorageClass != COFF_SYMBOL_STORAGE_CLASS_STATIC) {
+        ; Merge exported symbols into text section
+        /** @type {MCL.Symbol} */
+        symbol := unset
+        for name, symbol in linker.symbolsByName {
+            if (name = "__main" || RegExMatch(name, "^__MCL_[fg]_(\w+)")) {
+                linker.MergeSections(textSection, symbol.section)
+                exportCount++
+            } else if (
+                symbol.type = COFF_SYMBOL_TYPE_FUNCTION &&
+                Symbol.StorageClass != COFF_SYMBOL_STORAGE_CLASS_STATIC
+            ) {
                 NonExportedFunctions.Push(Symbol)
             }
         }
-		
-		OnUndefinedSymbolReference(Relocation) {
-			Name := Relocation.Symbol.Name
-			
-			;MsgBox('Undefined ' Name)
-			
-			for SymbolName, Symbol in Linker.SymbolsByName {
-				if (Name != SymbolName && InStr(SymbolName, "w_" Name) && InStr(SymbolName, ".text")) {
-					;MsgBox('Mapped ' Name ' => ' SymbolName)
-					Relocation.Symbol := Symbol
-					return
-				}
-			}
-			
-			throw Error("Reference to undefined symbol " Name)
-		}
-		
-		Linker.ResolveUndefinedSymbolReferences(OnUndefinedSymbolReference)
 
-        if (ExportCount = 0 && NonExportedFunctions.Length = 1) {
-            ; Special case for compatibility with old mcode, if there's only one function defined (and none exported)
-            ;  then we'll help out and turn that function into `__main` (like old mcode expects) and return
-            ;   a pointer directly to it in `.Load` which should make things easier to port
+        OnUndefinedSymbolReference(relocation) {
+            name := relocation.symbol.name
 
-            SingleFunction := NonExportedFunctions[1]
-
-            Linker.MergeSections(TextSection, SingleFunction.Section)
+            for symbolName, symbol in linker.symbolsByName {
+                if (name != symbolName && InStr(symbolName, "w_" name) && InStr(symbolName, ".text")) {
+                    relocation.symbol := symbol
+                    return
+                }
+            }
+            
+            throw Error("Reference to undefined symbol " name)
         }
 
-        Linker.MakeSectionStandalone(TextSection)
-        Linker.DoStaticRelocations(TextSection)
+        linker.ResolveUndefinedSymbolReferences(OnUndefinedSymbolReference)
 
-        Imports := Map()
-        Exports := Map()
+        ; Special case for compatibility with old mcode, if there's only one
+        ; function defined (and none exported) then we'll help out and turn that
+        ; function into `__main` (like old mcode expects) and return a pointer
+        ; directly to it in `.Load` which should make things easier to port
+        if (exportCount == 0 && nonExportedFunctions.Length == 1) {
+            singleFunction := nonExportedFunctions[1]
+            linker.MergeSections(textSection, singleFunction.section)
+        }
 
-        if IsObject(SingleFunction)
-            Exports[SingleFunction.Name] := SingleFunction.Value
+        linker.MakeSectionStandalone(textSection)
+        linker.DoStaticRelocations(textSection)
 
-        for SymbolName, Symbol in TextSection.SymbolsByName {
-            if (SymbolName = "__main") {
-                Exports[SymbolName] := Symbol.Value
+        imports := Map()
+        exports := Map()
+
+        ; Export the single function, when present
+        if IsSet(singleFunction) {
+            export := MCL.Export()
+            export.type := "f"
+            export.name := "__main" ;singleFunction.name
+            export.types := ""
+            export.value := singleFunction.value
+            exports[export.name] := export
+        }
+
+        for symbolName, symbol in textSection.SymbolsByName {
+            ; Export the __main function, when present
+            if (symbolName = "__main") {
+                export := MCL.Export()
+                export.type := "f"
+                export.name := symbolName
+                export.types := ""
+                export.value := symbol.value
+                exports[export.name] := export
                 continue
             }
 
-            if RegExMatch(SymbolName, "^__MCL_([ifg])_([\w\$]+?)(?:\$([\w\$]+))?$", &Match) {
-                if (Match[1] = "i") {
-                    RegExMatch(SymbolName, "^__MCL_([ifg])_([\w\$]+)$", &Match)
-                    Imports[Match[2]] := Symbol.Value
+            ; Process macro-annotated symbols
+            if RegExMatch(SymbolName, "^__MCL_([ifg])_([\w\$]+?)(?:\$([\w\$]+))?$", &match) {
+                ; imported symbol
+                if (match[1] = "i") {
+                    RegExMatch(SymbolName, "^__MCL_([ifg])_([\w\$]+)$", &match)
+                    import := MCL.Import()
+                    import.name := match[2]
+                    import.offset := symbol.value
+                    imports[import.name] := import
                     continue
                 }
 
-                if (Match[3] ~= "\$ERROR$")
-                    throw Error("Too many parameters given to export of " Match[2])
+                if (match[3] ~= "\$ERROR$")
+                    throw Error("Too many parameters given to export of " match[2])
 
-                Exports[Match[2]] := { value: Symbol.Value, type: Match[1], types: Match[3] }
+                ; exported symbol
+                export := MCL.Export()
+                export.type := match[1]
+                export.name := match[2]
+                export.types := match[3]
+                export.value := symbol.value
+                exports[export.name] := export
             }
         }
 
-        if (Exports.Count = 0)
+        ; Validate exports
+        if exports.Count == 0
             throw Error("Code does not define '__main', or export any functions")
 
         static IMAGE_REL_I386_DIR32 := 0x6
         static IMAGE_REL_AMD64_ADDR64 := 0x1
 
-        Relocations := Map()
-        RelocationDataType := Linker.Is32Bit ? "Int" : "Int64"
+        relocations := Map()
+        relocationDataType := linker.is32Bit ? "Int" : "Int64"
 
-        for k, Relocation in TextSection.Relocations {
-            if (!IsSet(Relocation))
+        /** @type {MCL.Relocation} */
+        relocation := unset
+        for k, relocation in textSection.relocations {
+            if !IsSet(relocation)
                 continue
 
-            if (Relocation.Symbol.Section.Name != ".text")
+            if relocation.symbol.section.name != ".text"
                 continue
 
-            if (Relocation.Type != IMAGE_REL_I386_DIR32 && Relocation.Type != IMAGE_REL_AMD64_ADDR64)
+            if (
+                relocation.type != IMAGE_REL_I386_DIR32 &&
+                relocation.type != IMAGE_REL_AMD64_ADDR64
+            )
                 continue
 
-            Offset := TextSection.Data.Read(Relocation.Address, RelocationDataType)
-            Address := Relocation.Symbol.Value + Offset
-            TextSection.Data.Write(Address, Relocation.Address, RelocationDataType)
+            offset := textSection.data.Read(relocation.address, relocationDataType)
+            address := relocation.symbol.value + offset
+            textSection.data.Write(address, relocation.address, relocationDataType)
 
-            Relocations[k] := Relocation.Address
+            relocations[k] := relocation.address
         }
 
-        CodeSize := TextSection.Data.Length()
+        codeSize := textSection.data.Length()
 
-        if !(code := Buffer(CodeSize))
+        if !(outputBuffer := Buffer(CodeSize))
             throw Error("Failed to reserve MCL PE memory")
 
-        TextSection.Data.Coalesce(code.Ptr)
+        textSection.data.Coalesce(outputBuffer.Ptr)
 
-        return [code, Imports, Exports, Relocations, Bitness]
+        result := MCL.CompiledCode()
+        result.code := outputBuffer
+        result.imports := imports
+        result.exports := exports
+        result.relocations := relocations
+        result.bitness := bitness
+
+        return result
     }
 
-    static Load(code, Imports, Exports, Relocations, Bitness) {
-        for ImportName, ImportOffset in Imports {
-            Import := StrSplit(ImportName, "$")
-            DllName := Import[1]
-            FunctionName := Import[2]
+    /**
+     * Loads compiled code into memory to be executed
+     *
+     * @param {MCL.CompiledCode} input The compiled code to load
+     * @returns {$}
+     */
+    static Load(input) {
+        /** @type {MCL.Import} */
+        import := unset
+        for names, import in input.imports {
+            names := StrSplit(names, "$")
+            dllName := names[1]
+            functionName := names[2]
 
-            ; Clear A_LastError. Something has left it set here before, and GetModuleHandle doesn't clear it.
+            ; Clear A_LastError. Something has left it set here before, and
+            ; GetModuleHandle doesn't clear it.
             DllCall("SetLastError", "Int", 0)
 
-            hDll := DllCall("GetModuleHandle", "Str", DllName, "Ptr")
+            hDll := DllCall("GetModuleHandle", "Str", dllName, "Ptr")
             if A_LastError
-                throw Error("Could not load dll " DllName ", LastError " Format("{:0x}", A_LastError))
+                throw Error("Could not load dll " dllName ", LastError " Format("{:0x}", A_LastError))
 
             DllCall("SetLastError", "Int", 0)
-            pFunction := DllCall("GetProcAddress", "Ptr", hDll, "AStr", FunctionName, "Ptr")
+            pFunction := DllCall("GetProcAddress", "Ptr", hDll, "AStr", functionName, "Ptr")
             if A_LastError
-                throw Error("Could not find function " FunctionName " from " DllName ".dll, LastError " Format("{:0x}", A_LastError))
+                throw Error("Could not find function " functionName " from " dllName ".dll, LastError " Format("{:0x}", A_LastError))
 
-            NumPut("Ptr", pFunction, code.Ptr, ImportOffset)
+            NumPut("Ptr", pFunction, input.code, import.offset)
         }
 
-        for k, Offset in Relocations {
-            Old := NumGet(code.Ptr, Offset, "Ptr")
-            NumPut("Ptr", Old + code.Ptr, code.Ptr, Offset)
+        for k, Offset in input.relocations {
+            old := NumGet(input.code, Offset, "Ptr")
+            NumPut("Ptr", old + input.code.Ptr, input.code, Offset)
         }
 
-        if !DllCall("VirtualProtect", "Ptr", code.Ptr, "Ptr", code.Size, "UInt", 0x40, "UInt*", &OldProtect := 0, "UInt")
+        if !DllCall("VirtualProtect", "Ptr", input.code, "Ptr", input.code.Size, "UInt", 0x40, "UInt*", &OldProtect := 0, "UInt")
             throw Error("Failed to mark MCL memory as executable")
 
-        for name, data in Exports
-            data.value += code.Ptr
+        /** @type {MCL.Export} */
+        exp := unset
+        for name, exp in input.exports
+            exp.value += input.code.Ptr
 
         library := {
-            code: code,
-            exports: Exports,
-            Call: (this, params*) => this.__main(params*)
+            code: input.code,
+            exports: input.exports,
+            Call: (this, params*) => this.__main(params*),
+            Ptr: input.exports.Has("__main") ? input.exports["__main"].value : unset
         }
 
-        for name, data in Exports {
-            if (data.type = "f") { ; function
-                params := []
-                for k, v in StrSplit(data.types, "$")
-                    (A_Index & 1) ? params.Push(StrReplace(v, '_', ' ')) : params.Push(unset)
-                library.%name% := ((this, p*) => DllCall(p*)).Bind(unset, data.value, params*)
-            }
-            if (data.type = "g") { ; global
+        for name, exp in input.exports {
+            if !exp.types {
                 library.DefineProp(name, {
-                    get: ((this, p*) => NumGet(p*)).Bind(unset, data.value, data.types),
-                    set: ((this, p*) => NumPut(p*)).Bind(unset, data.types, unset, data.value)
+                    value: exp.value
+                })
+                continue
+            }
+
+            if exp.type = "f" { ; function
+                params := []
+                for k, v in StrSplit(exp.types, "$")
+                    (A_Index & 1) ? params.Push(StrReplace(v, '_', ' ')) : params.Push(unset)
+                library.DefineProp(name, {
+                    call: ((this, p*) => DllCall(p*)).Bind(unset, exp.value, params*)
+                })
+            } else if exp.type = "g" { ; global
+                library.DefineProp(name, {
+                    get: ((this, p*) => NumGet(p*)).Bind(unset, exp.value, exp.types),
+                    set: ((this, p*) => NumPut(p*)).Bind(unset, exp.types, unset, exp.value)
                 })
             }
         }
@@ -545,7 +728,14 @@ class MCL {
     ;     }
     ; }
 
-    static StandalonePack(Name, code, Imports, Exports, Relocations, Bitness) {
+    /**
+     * Packs the given compiled code into a standalone AHK function
+     *
+     * @param {String} name The name of the function to be generated
+     * @param {MCL.CompiledCode} input The compiled code to be packed
+     * @returns {string} The standalone AHK code
+     */
+    static StandalonePack(name, input) {
         RunTemplate(input, context := {}, ahkPath := A_AhkPath) {
             Quote(text) {
                 for pair in [["``", "``" "``"], ["`r", "``r"], ["`n", "``n"], ["`t", "``t"], ["'", "``'"]]
@@ -586,19 +776,19 @@ class MCL {
             return context.result
         }
 
-        compressed := MCL.LZ.Compress(code)
+        compressed := MCL.LZ.Compress(input.code)
         base64 := MCL.Base64.Encode(compressed)
 
         template := FileRead(A_LineFile "/../StandaloneTemplate_AsFunc.atp")
         template := RunTemplate(template, {
-            name: Name,
+            name: name,
             base64: base64,
-            codeSize: code.size,
-            bitness: Bitness,
+            codeSize: input.code.size,
+            bitness: input.bitness,
             compressedSize: compressed.Size,
-            imports: imports,
-            relocations: relocations,
-            exports: exports,
+            imports: input.imports,
+            relocations: input.relocations,
+            exports: input.exports,
             result: ""
         })
 
@@ -624,18 +814,18 @@ class MCL {
         Result := (Literal ? '"' : '') "V0.3|"
 
         if (Options & MCL.Options.OutputMask = MCL.Options.OutputAHKBit) {
-            Result .= MCL.Pack(Literal, MCL.Compile(Compiler, Code, CompilerOptions)*)
+            Result .= MCL.Pack(Literal, MCL.Compile(Compiler, Code, CompilerOptions))
             return Result
         }
 
         if (Options & MCL.Options.Output32Bit)
-            Result .= MCL.Pack(Literal, MCL.Compile(Compiler, Code, CompilerOptions, 32)*)
+            Result .= MCL.Pack(Literal, MCL.Compile(Compiler, Code, CompilerOptions, 32))
 
         if (Options & MCL.Options.Output64Bit) {
             if (Options & MCL.Options.Output32Bit)
                 Result .= (Literal ? '`n."' : '') "|"
 
-            Result .= MCL.Pack(Literal, MCL.Compile(Compiler, Code, CompilerOptions, 64)*)
+            Result .= MCL.Pack(Literal, MCL.Compile(Compiler, Code, CompilerOptions, 64))
         }
 
         return Result
@@ -643,16 +833,16 @@ class MCL {
 
     static StandaloneAHKFromLanguage(Compiler, Code, Options, CompilerOptions := "", Name := "") {
         if (Options & MCL.Options.OutputMask = MCL.Options.OutputAHKBit)
-            return MCL.StandalonePack(Name, MCL.Compile(Compiler, Code, CompilerOptions)*)
+            return MCL.StandalonePack(Name, MCL.Compile(Compiler, Code, CompilerOptions))
 
         Result := ""
 
         if (Options & MCL.Options.Output32Bit) {
-            Result .= MCL.StandalonePack(Name "32Bit", MCL.Compile(Compiler, Code, CompilerOptions, 32)*) "`n"
+            Result .= MCL.StandalonePack(Name "32Bit", MCL.Compile(Compiler, Code, CompilerOptions, 32)) "`n"
         }
 
         if (Options & MCL.Options.Output64Bit) {
-            Result .= MCL.StandalonePack(Name "64Bit", MCL.Compile(Compiler, Code, CompilerOptions, 64)*) "`n"
+            Result .= MCL.StandalonePack(Name "64Bit", MCL.Compile(Compiler, Code, CompilerOptions, 64)) "`n"
 
             if (Options & MCL.Options.Output32Bit) {
                 Result .= Name "() {`n`treturn A_PtrSize = 4 ? this." Name "32Bit() : this." Name "64Bit()`n}`n"
@@ -671,7 +861,7 @@ class MCL {
             Bitness := 64
         }
 
-        return MCL.Load(MCL.Compile("gcc", Code, , Bitness)*)
+        return MCL.Load(MCL.Compile("gcc", Code, , Bitness))
     }
     static AHKFromC(Code, Options := 0) {
         return MCL.AHKFromLanguage("gcc", Code, Options)
@@ -689,7 +879,7 @@ class MCL {
             Bitness := 64
         }
 
-        return MCL.Load(MCL.Compile("g++", 'extern "C" {`n' Code "`n}", " -fno-exceptions -fno-rtti", Bitness)*)
+        return MCL.Load(MCL.Compile("g++", 'extern "C" {`n' Code "`n}", " -fno-exceptions -fno-rtti", Bitness))
     }
     static AHKFromCPP(Code, Options := 0) {
         return MCL.AHKFromLanguage("g++", 'extern "C" {`n' Code "`n}", Options, " -fno-exceptions -fno-rtti")

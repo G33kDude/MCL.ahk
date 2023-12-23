@@ -108,19 +108,30 @@ class MCLTests {
         ImplicitExport() {
             lib := MCL.FromC(FileRead("ImplicitExport.c"))
 
-            ; No longer supported
-            Yunit.Assert(False)
+            result := DllCall(lib, "Int", 2, "Int", 9, "CDecl Int")
+            Yunit.Assert(result == 0x400)
+
+            result := DllCall(lib, "Int", 0x10, "Int", 13, "CDecl Int")
+            Yunit.Assert(result == 0x20000)
         }
 
         ImplicitAllocateMemoryAndWriteString() {
-            ; The big difference between this test and the last one is that this one also pulls in the stdlib
-            ;  headers, which define a bunch of (static) functions of their own. If static functions aren't
-            ;   handled correctly then the main function can't be guessed and this test will fail.
-            ; The proper behavior is that static functions aren't considered when trying to guess which function is
-            ;  the real main function.
+            ; The big difference between this test and the last one is that this
+            ; one also pulls in the stdlib headers, which define a bunch of
+            ; (static) functions of their own. If static functions aren't
+            ; handled correctly then the main function can't be guessed and this
+            ; test will fail. The proper behavior is that static functions
+            ; aren't considered when trying to guess which function is the real
+            ; main function.
 
-            ; No longer supported
-            Yunit.Assert(False)
+            lib := MCL.FromC(FileRead("ImplicitAllocateMemoryAndWriteString.c"))
+
+            result := DllCall(lib, "CDecl AStr")
+
+            Yunit.Assert(
+                result == "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+                "C code generated incorrect string '" result "'"
+            )
         }
 
         AHKFromIsFormattedCorrectly() {

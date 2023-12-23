@@ -2,8 +2,8 @@
 
 imports := ""
 for k, v in ctx.imports {
-	parts := StrSplit(k, '$')
-	imports .= ", ['" parts[1] "', '" parts[2] "'], " v
+	parts := StrSplit(v.name, '$')
+	imports .= ", ['" parts[1] "', '" parts[2] "'], " v.offset
 }
 imports := "Map(" SubStr(imports, 3) ")"
 
@@ -45,7 +45,7 @@ while StrLen(base64) {
 	?>"Ptr", buf, "UInt", buf.Size, "UInt*", &DecompressedSize := 0, "UInt"))
 		throw Error("Error calling RtlDecompressBuffer",, Format("0x{:08x}", r))
 	
-<? if imports != "[]" { ?>
+<? if imports != "Map()" { ?>
 	for import, offset in <?= imports ?> {
 		if !(hDll := DllCall("GetModuleHandle", "Str", import[1], "Ptr"))
 			throw Error("Could not load dll " import[1] ": " OsError().Message)
