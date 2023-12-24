@@ -80,18 +80,18 @@ if !function_exports.Count {
 		code: code<?
 for name, data in function_exports {
 	?>,
-	<?= name ?>: (this<?
-		for v in StrSplit(data.types, "$") {
-			if !(A_Index & 1) {
-				?>, <?= v ?><?
-			}
-		}
-	?>) =>
-		DllCall(this.code.Ptr + <?= data.value ?><?
+		<?= name ?>: (this<?
 			for v in StrSplit(data.types, "$") {
-				?>, <?= A_Index & 1 ? '"' StrReplace(v, "_", " ") '"' : v ?><?
+				if !(A_Index & 1) {
+					?>, <?= v ?><?
+				}
 			}
-		?>)<?
+		?>) =>
+			DllCall(this.code.Ptr + <?= data.value ?><?
+				for v in StrSplit(data.types, "$") {
+					?>, <?= A_Index & 1 ? '"' StrReplace(v, "_", " ") '"' : v ?><?
+				}
+			?>)<?
 }
 ?>
 	}
