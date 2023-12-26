@@ -5,6 +5,223 @@
  * MCL
  */
 class MCL {
+
+    ;#region Public ------------------------------------------------------------
+
+    /**
+     * Compiles C code and loads it into memory for execution
+     *
+     * @param {String} code The C code to be compiled
+     * @param {Object} [compilerOptions] Options for the compiler
+     * @returns The loaded MCode
+     * 
+     * @example
+     * lib := MCL.FromC('int __main() { return 42; }')
+     * MsgBox DllCall(lib, "CDecl Int")
+     */
+    static FromC(code, compilerOptions := {}) =>
+        MCL._Load(MCL._Compile("gcc", code, compilerOptions))
+
+    /**
+     * Compiles C++ code and loads it into memory for execution
+     *
+     * @param {String} code The C++ code to be compiled
+     * @param {Object} [compilerOptions] Options for the compiler
+     * @returns The loaded MCode
+     * 
+     * @example
+     * lib := MCL.FromCPP('int __main() { return 42; }')
+     * MsgBox DllCall(lib, "CDecl Int")
+     */
+    static FromCPP(code, compilerOptions := {}, rendererOptions := {}) {
+        if !compilerOptions.HasProp('flags')
+            compilerOptions.flags := ''
+        compilerOptions.flags .= ' -fno-exceptions -fno-rtti'
+        return MCL._Load(
+            MCL._Compile("g++", 'extern "C" {`n' code "`n}", compilerOptions)
+        )
+    }
+
+    /**
+     * Compiles C code and packs it into a string to be saved and loaded later.
+     * By default, both 32 and 64 bit MCode will be generated. To generate only
+     * one or the other, set the `bitness` property on `compilerOptions` to the
+     * target bitness.
+     * 
+     * @param {String} code The C code to be compiled
+     * @param {Object} [compilerOptions] Options for the compiler
+     * @param {Object} [rendererOptions] Options for the string packer
+     * @returns {String} The packed string
+     * 
+     * @example
+     * MsgBox MCL.StringFromC('int __main() { return 42; }')
+     */
+    static StringFromC(code, compilerOptions := {}, rendererOptions := {}) =>
+        MCL._StringFromLanguage("gcc", code, compilerOptions, rendererOptions)
+
+    /**
+     * Compiles C++ code and packs it into a string to be saved and loaded
+     * later. By default, both 32 and 64 bit MCode will be generated. To
+     * generate only one or the other, set the `bitness` property on
+     * `compilerOptions` to the target bitness.
+     * 
+     * @param {String} code The C++ code to be compiled
+     * @param {Object} [compilerOptions] Options for the compiler
+     * @param {Object} [rendererOptions] Options for the string packer
+     * @returns {String} The packed string
+     * 
+     * @example
+     * MsgBox MCL.StringFromCPP('int __main() { return 42; }')
+     */
+    static StringFromCPP(code, compilerOptions := {}, rendererOptions := {}) {
+        if !compilerOptions.HasProp('flags')
+            compilerOptions.flags := ''
+        compilerOptions.flags .= ' -fno-exceptions -fno-rtti'
+        return MCL._StringFromLanguage(
+            "g++", 'extern "C" {`n' code "`n}", compilerOptions, rendererOptions
+        )
+    }
+
+    /**
+     * Compiles C code and generates AutoHotkey source code that will load it
+     * without needing the MCL library. By default, both 32 and 64 bit MCode
+     * will be generated. To generate only one or the other, set the `bitness`
+     * property on `compilerOptions` to the target bitness.
+     * 
+     * @param {String} code The C code to be compiled
+     * @param {Object} [compilerOptions] Options for the compiler
+     * @param {Object} [rendererOptions] Options for the AHK generator
+     * @returns {String} The generated AHK source code
+     * 
+     * @example
+     * MsgBox MCL.StandaloneAHKFromC('int __main() { return 42; }')
+     */
+    static StandaloneAHKFromC(code, compilerOptions := {}, rendererOptions := {}) =>
+        MCL._StandaloneAHKFromLanguage("gcc", code, compilerOptions, rendererOptions)
+
+    /**
+     * Compiles C++ code and generates AutoHotkey source code that will load it
+     * without needing the MCL library. By default, both 32 and 64 bit MCode
+     * will be generated. To generate only one or the other, set the `bitness`
+     * property on `compilerOptions` to the target bitness.
+     * 
+     * @param {String} code The C++ code to be compiled
+     * @param {Object} [compilerOptions] Options for the compiler
+     * @param {Object} [rendererOptions] Options for the AHK generator
+     * @returns {String} The generated AHK source code
+     * 
+     * @example
+     * MsgBox MCL.StandaloneAHKFromCPP('int __main() { return 42; }')
+     */
+    static StandaloneAHKFromCPP(code, compilerOptions := {}, rendererOptions := {}) =>
+        MCL._StandaloneAHKFromLanguage(
+            "g++",
+            'extern "C" {`n' code "`n}",
+            compilerOptions.DefineProp('flags', { value: ' -fno-exceptions -fno-rtti'}),
+            rendererOptions
+        )
+
+    /**
+     * Loads MCode into memory for execution, as generated by
+     * {@link MCL.StringFromC} or {@link MCL.StringFromCPP}.
+     * 
+     * @param Code 
+     * @returns {void} 
+     */
+    static FromString(Code) {
+        Parts := StrSplit(Code, "|")
+        Version := Parts.RemoveAt(1)
+
+        if (Version != "V0.3")
+            throw Error("Unknown/corrupt MCL packed code format")
+
+        for k, Flavor in Parts {
+            Flavor := StrSplit(Flavor, ";")
+
+            if (Flavor.Length != 6)
+                throw Error("Unknown/corrupt MCL packed code format")
+
+            Bitness := Flavor[1] + 0
+            ImportsString := Flavor[2]
+            ExportsString := Flavor[3]
+            RelocationsString := Flavor[4]
+            CodeSize := Flavor[5] + 0
+            CodeBase64 := Flavor[6]
+
+            if (Bitness != (A_PtrSize * 8))
+                continue
+
+            Imports := Map()
+
+            for k, ImportEntry in StrSplit(ImportsString, ",") {
+                ImportEntry := StrSplit(ImportEntry, ":")
+
+                Imports[ImportEntry[1]] := ImportEntry[2] + 0
+            }
+
+            Exports := Map()
+
+            for k, ExportEntry in StrSplit(ExportsString, ",") {
+                ExportEntry := StrSplit(ExportEntry, ":")
+
+                Exports[ExportEntry[1]] := ExportEntry[2] + 0
+            }
+
+            Relocations := Map()
+
+            for k, Relocation in StrSplit(RelocationsString, ",")
+                Relocations[k] := Relocation + 0
+
+            if !(pBinary := DllCall("GlobalAlloc", "UInt", 0, "Ptr", CodeSize, "Ptr"))
+                throw Error("Failed to reserve MCL memory")
+
+            Data := ""
+            DecodedSize := MCL.Base64.Decode(CodeBase64, &Data)
+            MCL.LZ.Decompress(Data.Ptr, DecodedSize, pBinary, CodeSize)
+
+            return MCL._Load(pBinary, CodeSize, Imports, Exports, Relocations, Bitness)
+        }
+
+        throw Error("Program does not have a " (A_PtrSize * 8) " bit version")
+    }
+
+    /**
+     * A platform-specific prefix to apply to the compiler file name.
+     * 
+     * On Windows, this should be empty so that a standard-named compiler in the
+     * PATH will be detected. If your compiler is not in the PATH, it should be
+     * the absolute path to the compiler up to the text "gcc" or "g++".
+     * 
+     * On Linux, this should be the beginning of a compiler path up to the text
+     * "gcc" or "g++".
+     * 
+     * @prop {String} CompilerPrefix
+     * 
+     * @example
+     * MCL.CompilerPrefix := "/usr/bin/x86_64-w64-mingw32-"
+     */
+    static CompilerPrefix := ""
+
+    /**
+     * A platform-specific suffix to apply to the compiler file name.
+     * 
+     * On Windows, this should be ".exe" so that a compiler with a Windows file
+     * extension in the PATH will be detected.
+     * 
+     * On Linux, this should be the end of a compiler path after the text
+     * "gcc" or "g++", such as empty string.
+     * 
+     * @prop {String} CompilerSuffix
+     * 
+     * @example
+     * MCL.CompilerSuffix := ""
+     */
+    static CompilerSuffix := ".exe"
+
+    ;#endregion
+
+    ;#region Private -----------------------------------------------------------
+
     /** All the data needed to load machine code into a running script */
     class CompiledCode {
         /** @prop {Buffer} code The code */
@@ -245,25 +462,13 @@ class MCL {
      * 
      * @return {String} - The unique name, relative to `baseDir
      */
-    static GetTempPath(baseDir := A_Temp, prefix := "", suffix := ".tmp") {
+    static _GetTempPath(baseDir := A_Temp, prefix := "", suffix := ".tmp") {
         Loop {
             DllCall("QueryPerformanceCounter", "Int64*", &counter := 0)
             fileName := baseDir "\" prefix . counter . suffix
         } until !FileExist(fileName)
         return prefix . counter . suffix
     }
-
-    /**
-     * A platform-specific prefix to apply to the compiler file name 
-     * @prop {String} CompilerPrefix
-     */
-    static CompilerPrefix := ""
-
-    /**
-     * A platform-specific suffix to apply to the compiler file name
-     * @prop {String} CompilerSuffix
-     */
-    static CompilerSuffix := ".exe"
 
     /**
      * Checks if the compilers can be found with the given prefix and suffix.
@@ -277,7 +482,7 @@ class MCL {
      * 
      * @return False or a single of the prefix required to find the compiler
      */
-    static CompilersExist(prefix, suffix) {
+    static _CompilersExist(prefix, suffix) {
         if (FileExist(prefix "gcc" suffix) && FileExist(prefix "g++" suffix))
             return [prefix]
 
@@ -295,13 +500,13 @@ class MCL {
      * Attempt to automatically set CompilerPrefix based on PATH and known
      * cross compiler naming schemes.
      */
-    static TryFindCompilers() {
+    static _TryFindCompilers() {
         ; The default (or user provided values) are correct, no changes needed
-        if this.CompilersExist(this.CompilerPrefix, this.CompilerSuffix)
+        if this._CompilersExist(this.CompilerPrefix, this.CompilerSuffix)
             return
 
         ; Compiler executables might be named like they would be on Linux
-        if (prefix := this.CompilersExist(this.CompilerPrefix "x86_64-w64-mingw32-", this.CompilerSuffix)) {
+        if (prefix := this._CompilersExist(this.CompilerPrefix "x86_64-w64-mingw32-", this.CompilerSuffix)) {
             this.CompilerPrefix := Prefix[1]
             return
         }
@@ -326,86 +531,16 @@ class MCL {
      * 
      * @return {MCL.CompiledCode} A bunch of stuff
      */
-    static Compile(compiler, code, extraOptions := "", bitness := A_PtrSize * 8) {
+    static _Compile(compiler, code, options) {
+        #IncludeAgain Lib\StdoutToVar.ahk
 
-        StdoutToVar(sCmd, sDir:="", sEnc:="CP0") {
-            ; Create 2 buffer-like objects to wrap the handles to take advantage of the __Delete meta-function.
-            oHndStdoutRd := { Ptr: 0, __Delete: delete(this) => DllCall("CloseHandle", "Ptr", this) }
-            oHndStdoutWr := { Base: oHndStdoutRd }
-            
-            If !DllCall( "CreatePipe"
-                    , "PtrP" , oHndStdoutRd
-                    , "PtrP" , oHndStdoutWr
-                    , "Ptr"  , 0
-                    , "UInt" , 0 )
-                Throw OSError(,, "Error creating pipe.")
-            If !DllCall( "SetHandleInformation"
-                    , "Ptr"  , oHndStdoutWr
-                    , "UInt" , 1
-                    , "UInt" , 1 )
-                Throw OSError(,, "Error setting handle information.")
+        bitness := options.HasProp('bitness') ? options.bitness : A_PtrSize * 8
 
-            PI := Buffer(A_PtrSize == 4 ? 16 : 24,  0)
-            SI := Buffer(A_PtrSize == 4 ? 68 : 104, 0)
-            NumPut( "UInt", SI.Size,          SI,  0 )
-            NumPut( "UInt", 0x100,            SI, A_PtrSize == 4 ? 44 : 60 )
-            NumPut( "Ptr",  oHndStdoutWr.Ptr, SI, A_PtrSize == 4 ? 60 : 88 )
-            NumPut( "Ptr",  oHndStdoutWr.Ptr, SI, A_PtrSize == 4 ? 64 : 96 )
+        this._TryFindCompilers()
 
-            If !DllCall( "CreateProcess"
-                    , "Ptr"  , 0
-                    , "Str"  , sCmd
-                    , "Ptr"  , 0
-                    , "Ptr"  , 0
-                    , "Int"  , True
-                    , "UInt" , 0x08000000
-                    , "Ptr"  , 0
-                    , "Ptr"  , sDir ? StrPtr(sDir) : 0
-                    , "Ptr"  , SI
-                    , "Ptr"  , PI )
-                Throw OSError(,, "Error creating process.")
-
-            ; The write pipe must be closed before reading the stdout so we release the object.
-            ; The reading pipe will be released automatically on function return.
-            oHndStdOutWr := ""
-
-            ; Before reading, we check if the pipe has been written to, so we avoid freezings.
-            nAvail := 0, nLen := 0
-            While DllCall( "PeekNamedPipe"
-                        , "Ptr"   , oHndStdoutRd
-                        , "Ptr"   , 0
-                        , "UInt"  , 0
-                        , "Ptr"   , 0
-                        , "UIntP" , &nAvail
-                        , "Ptr"   , 0 ) != 0
-            {
-                ; If the pipe buffer is empty, sleep and continue checking.
-                If !nAvail && Sleep(100)
-                    Continue
-                cBuf := Buffer(nAvail+1)
-                DllCall( "ReadFile"
-                    , "Ptr"  , oHndStdoutRd
-                    , "Ptr"  , cBuf
-                    , "UInt" , nAvail
-                    , "PtrP" , &nLen
-                    , "Ptr"  , 0 )
-                sOutput .= StrGet(cBuf, nLen, sEnc)
-            }
-            
-            ; Get the exit code, close all process handles and return the output object.
-            DllCall( "GetExitCodeProcess"
-                , "Ptr"   , NumGet(PI, 0, "Ptr")
-                , "UIntP" , &nExitCode:=0 )
-            DllCall( "CloseHandle", "Ptr", NumGet(PI, 0, "Ptr") )
-            DllCall( "CloseHandle", "Ptr", NumGet(PI, A_PtrSize, "Ptr") )
-            Return { Output: sOutput, ExitCode: nExitCode } 
-        }
-
-        this.TryFindCompilers()
-
-        includeFolder := this.GetTempPath(A_WorkingDir, "mcl-include-", "")
-        inputFile := this.GetTempPath(A_WorkingDir, "mcl-input-", ".c")
-        outputFile := this.GetTempPath(A_WorkingDir, "mcl-output-", ".o")
+        includeFolder := this._GetTempPath(A_WorkingDir, "mcl-include-", "")
+        inputFile := this._GetTempPath(A_WorkingDir, "mcl-input-", ".c")
+        outputFile := this._GetTempPath(A_WorkingDir, "mcl-output-", ".o")
 
         try {
             FileOpen(inputFile, "w").Write(code)
@@ -418,7 +553,8 @@ class MCL {
                 inputFile " "
                 "-o " outputFile " "
                 "-I " includeFolder " "
-                "-D MCL_BITNESS=" bitness extraOptions " "
+                "-D MCL_BITNESS=" bitness " "
+                (options.HasProp('flags') ? options.flags : '') " "
                 "-ffreestanding "
                 "-nostdlib "
                 "-Wno-attribute-alias "
@@ -431,6 +567,16 @@ class MCL {
 
             if out.ExitCode
                throw Error(StrReplace(out.Output, " ", " "), , "Compiler Error")
+
+            ; When running under Wine, StdOutToVar tends to return immediately
+            ; rather than waiting for the process to exit. Until a better option
+            ; comes along, just wait here a bit for the output file to appear.
+            try {
+                DllCall("ntdll.dll\wine_get_version", "AStr")
+                loop
+                    Sleep 100
+                until (FileExist(OutputFile) || A_Index > 60)
+            }
 
             if !(f := FileOpen(OutputFile, "r"))
                 throw Error("Failed to load output file")
@@ -615,7 +761,7 @@ class MCL {
      * @param {MCL.CompiledCode} input The compiled code to load
      * @returns {$}
      */
-    static Load(input) {
+    static _Load(input) {
         /** @type {MCL.Import} */
         import := unset
         for names, import in input.imports {
@@ -732,56 +878,22 @@ class MCL {
      * Packs the given compiled code into a standalone AHK function
      *
      * @param {String} name The name of the function to be generated
-     * @param {MCL.CompiledCode} input The compiled code to be packed
+     * @param {Array<MCL.CompiledCode>} inputs The compiled code to be packed
+     * @param {Array<MCL.CompiledCode>} inputs The compiled code to be packed
      * @returns {string} The standalone AHK code
      */
-    static StandalonePack(name, input) {
-        RunTemplate(input, context := {}, ahkPath := A_AhkPath) {
-            Quote(text) {
-                for pair in [["``", "``" "``"], ["`r", "``r"], ["`n", "``n"], ["`t", "``t"], ["'", "``'"]]
-                    text := StrReplace(text, pair*)
-                return "'" text "'"
-            }
-            code := "", pos := 1
-            while foundPos := RegExMatch(input, "s)<\?\s*(.*?)\s*\?>", &match, pos) {
-                code .= (
-                    (foundPos <= pos ? "" : "ctx.result .= " Quote(SubStr(input, pos, foundPos - pos)) "`n")
-                    (match.1 ~= "^=" ? "ctx.result .= (" SubStr(match.1, 2) ")`n" : match.1 "`n")
-                ), pos := foundPos + match.Len
-            }
-            if pos <= StrLen(input)
-                code .= "ctx.result .= " Quote(SubStr(input, pos)) "`n"
-            IID_IDispatch := Buffer(16)
-            NumPut("Int64", 0x20400, "Int64", 0x46000000000000c0, IID_IDispatch)
-            lResult := DllCall("oleacc\LresultFromObject", "Ptr", IID_IDispatch, "Ptr", 0, "Ptr", ObjPtr(context), "Ptr")
-            try {
-                exec := ComObject("WScript.Shell").Exec('"' ahkPath '" *')
-                exec.StdIn.Write(Format(
-                    'ctx := ((lResult) => (`n'
-                    '    IID_IDispatch := Buffer(16),`n'
-                    '       NumPut("Int64", 0x20400, "Int64", 0x46000000000000c0, IID_IDispatch),`n'
-                    '       DllCall("oleacc\ObjectFromLresult", "Ptr", lResult, "Ptr", IID_IDispatch, "Ptr", 0, "Ptr*", &pObj := 0),`n'
-                    '       ComValue(9, pObj)`n'
-                    '))({})`n'
-                    '{}',
-                    lResult,
-                    code))
-                exec.StdIn.Close()
-                while exec.Status = 0
-                    Sleep(10)
-            } catch Any as e {
-                DllCall("oleacc\ObjectFromLresult", "Ptr", lResult, "Ptr", IID_IDispatch, "Ptr", 0, "Ptr*", ComValue(9, 0))
-                throw e
-            }
-            return context.result
-        }
+    static _StandalonePack(inputs, rendererOptions := {}) {
+        #IncludeAgain lib\RunTemplate.ahk
+
+        /** @type {MCL.CompiledCode} */
+        input := inputs[1]
 
         compressed := MCL.LZ.Compress(input.code)
         base64 := MCL.Base64.Encode(compressed)
 
         template := FileRead(A_LineFile "/../StandaloneTemplate_AsFunc.atp")
         template := RunTemplate(template, {
-            name: name,
+            name: (rendererOptions.HasProp('name') ? rendererOptions.name : 'MyC'),
             base64: base64,
             codeSize: input.code.size,
             bitness: input.bitness,
@@ -797,151 +909,26 @@ class MCL {
         return template
     }
 
-    class Options {
-        static OutputAHKBit => 0
-        static Output32Bit => 1
-        static Output64Bit => 2
-        static OutputBothBit => 3
-        static OutputMask => 3
+    static _StringFromLanguage(compiler, code, compilerOptions := {}, rendererOptions := {}) {
+        compiledCodes := []
+        if !compilerOptions.HasProp('bitness') || compilerOptions.bitness == 32
+            compiledCodes.Push(MCL._Compile(Compiler, Code, CompilerOptions, 32))
+        if !compilerOptions.HasProp('bitness') || compilerOptions.bitness == 64
+            compiledCodes.Push(MCL._Compile(Compiler, Code, CompilerOptions, 64))
 
-        static FormatAsStringLiteral => 0
-        static DoNotFormat => 4
+        return MCL.Pack(compiledCodes, rendererOptions)
     }
 
-    static AHKFromLanguage(Compiler, Code, Options, CompilerOptions := "") {
-        Literal := !(Options & MCL.Options.DoNotFormat)
+    static _StandaloneAHKFromLanguage(compiler, code, compilerOptions := {}, rendererOptions := {}) {
+        compiledCodes := []
+        if !compilerOptions.HasProp('bitness') || compilerOptions.bitness == 32
+            compiledCodes.Push(MCL._Compile(Compiler, Code, CompilerOptions, 32))
+        if !compilerOptions.HasProp('bitness') || compilerOptions.bitness == 64
+            compiledCodes.Push(MCL._Compile(Compiler, Code, CompilerOptions, 64))
 
-        Result := (Literal ? '"' : '') "V0.3|"
-
-        if (Options & MCL.Options.OutputMask = MCL.Options.OutputAHKBit) {
-            Result .= MCL.Pack(Literal, MCL.Compile(Compiler, Code, CompilerOptions))
-            return Result
-        }
-
-        if (Options & MCL.Options.Output32Bit)
-            Result .= MCL.Pack(Literal, MCL.Compile(Compiler, Code, CompilerOptions, 32))
-
-        if (Options & MCL.Options.Output64Bit) {
-            if (Options & MCL.Options.Output32Bit)
-                Result .= (Literal ? '`n."' : '') "|"
-
-            Result .= MCL.Pack(Literal, MCL.Compile(Compiler, Code, CompilerOptions, 64))
-        }
-
-        return Result
+        return MCL._StandalonePack(compiledCodes, rendererOptions)
     }
 
-    static StandaloneAHKFromLanguage(Compiler, Code, Options, CompilerOptions := "", Name := "") {
-        if (Options & MCL.Options.OutputMask = MCL.Options.OutputAHKBit)
-            return MCL.StandalonePack(Name, MCL.Compile(Compiler, Code, CompilerOptions))
+    ;#endregion
 
-        Result := ""
-
-        if (Options & MCL.Options.Output32Bit) {
-            Result .= MCL.StandalonePack(Name "32Bit", MCL.Compile(Compiler, Code, CompilerOptions, 32)) "`n"
-        }
-
-        if (Options & MCL.Options.Output64Bit) {
-            Result .= MCL.StandalonePack(Name "64Bit", MCL.Compile(Compiler, Code, CompilerOptions, 64)) "`n"
-
-            if (Options & MCL.Options.Output32Bit) {
-                Result .= Name "() {`n`treturn A_PtrSize = 4 ? this." Name "32Bit() : this." Name "64Bit()`n}`n"
-            }
-        }
-
-        return Result
-    }
-
-    static FromC(Code, Options := 0) {
-        Bitness := A_PtrSize * 8
-
-        if (Options & MCL.Options.Output32Bit) {
-            Bitness := 32
-        } else if (Options & MCL.Options.Output64Bit) {
-            Bitness := 64
-        }
-
-        return MCL.Load(MCL.Compile("gcc", Code, , Bitness))
-    }
-    static AHKFromC(Code, Options := 0) {
-        return MCL.AHKFromLanguage("gcc", Code, Options)
-    }
-    static StandaloneAHKFromC(Code, Options := 0, Name := "MyC") {
-        return MCL.StandaloneAHKFromLanguage("gcc", Code, Options, , Name)
-    }
-
-    static FromCPP(Code, Options := 0) {
-        Bitness := A_PtrSize * 8
-
-        if (Options & MCL.Options.Output32Bit) {
-            Bitness := 32
-        } else if (Options & MCL.Options.Output64Bit) {
-            Bitness := 64
-        }
-
-        return MCL.Load(MCL.Compile("g++", 'extern "C" {`n' Code "`n}", " -fno-exceptions -fno-rtti", Bitness))
-    }
-    static AHKFromCPP(Code, Options := 0) {
-        return MCL.AHKFromLanguage("g++", 'extern "C" {`n' Code "`n}", Options, " -fno-exceptions -fno-rtti")
-    }
-    static StandaloneAHKFromCPP(Code, Options := 0, Name := "MyCPP") {
-        return MCL.StandaloneAHKFromLanguage("g++", 'extern "C" {`n' Code "`n}", Options, " -fno-exceptions -fno-rtti", Name)
-    }
-
-    static FromString(Code) {
-        Parts := StrSplit(Code, "|")
-        Version := Parts.RemoveAt(1)
-
-        if (Version != "V0.3")
-            throw Error("Unknown/corrupt MCL packed code format")
-
-        for k, Flavor in Parts {
-            Flavor := StrSplit(Flavor, ";")
-
-            if (Flavor.Length != 6)
-                throw Error("Unknown/corrupt MCL packed code format")
-
-            Bitness := Flavor[1] + 0
-            ImportsString := Flavor[2]
-            ExportsString := Flavor[3]
-            RelocationsString := Flavor[4]
-            CodeSize := Flavor[5] + 0
-            CodeBase64 := Flavor[6]
-
-            if (Bitness != (A_PtrSize * 8))
-                continue
-
-            Imports := Map()
-
-            for k, ImportEntry in StrSplit(ImportsString, ",") {
-                ImportEntry := StrSplit(ImportEntry, ":")
-
-                Imports[ImportEntry[1]] := ImportEntry[2] + 0
-            }
-
-            Exports := Map()
-
-            for k, ExportEntry in StrSplit(ExportsString, ",") {
-                ExportEntry := StrSplit(ExportEntry, ":")
-
-                Exports[ExportEntry[1]] := ExportEntry[2] + 0
-            }
-
-            Relocations := Map()
-
-            for k, Relocation in StrSplit(RelocationsString, ",")
-                Relocations[k] := Relocation + 0
-
-            if !(pBinary := DllCall("GlobalAlloc", "UInt", 0, "Ptr", CodeSize, "Ptr"))
-                throw Error("Failed to reserve MCL memory")
-
-            Data := ""
-            DecodedSize := MCL.Base64.Decode(CodeBase64, &Data)
-            MCL.LZ.Decompress(Data.Ptr, DecodedSize, pBinary, CodeSize)
-
-            return MCL.Load(pBinary, CodeSize, Imports, Exports, Relocations, Bitness)
-        }
-
-        throw Error("Program does not have a " (A_PtrSize * 8) " bit version")
-    }
 }
