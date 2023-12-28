@@ -88,6 +88,8 @@ class MCL {
      * will be generated. To generate only one or the other, set the `bitness`
      * property on `compilerOptions` to the target bitness.
      * 
+     * @see {@link MCL._StandalonePack} for valid `rendererOptions`
+     * 
      * @param {String} code The C code to be compiled
      * @param {Object} [compilerOptions] Options for the compiler
      * @param {Object} [rendererOptions] Options for the AHK generator
@@ -104,6 +106,8 @@ class MCL {
      * without needing the MCL library. By default, both 32 and 64 bit MCode
      * will be generated. To generate only one or the other, set the `bitness`
      * property on `compilerOptions` to the target bitness.
+     * 
+     * @see {@link MCL._StandalonePack} for valid `rendererOptions`
      * 
      * @param {String} code The C++ code to be compiled
      * @param {Object} [compilerOptions] Options for the compiler
@@ -887,36 +891,243 @@ class MCL {
     /**
      * Packs the given compiled code into a standalone AHK function
      *
-     * @param {String} name The name of the function to be generated
-     * @param {Array<MCL.CompiledCode>} inputs The compiled code to be packed
-     * @param {Array<MCL.CompiledCode>} inputs The compiled code to be packed
+     * Looks for the following options:
+     * * `name` {String} Name for the exported loader. Default 'MCode'
+     * * `compress` {Boolean} Apply LZ compression to the MCode. Default true
+     * * `static` {Boolean} Generate a singleton output. Default true
+     * * `wrapper` {String} Type of wrapper to generate. Valid values are
+     *                      'function' and 'class'. Default 'function'
+     *
+     * @param {String} name The name of the wrapper to be generated
+     * @param {Array<MCL.CompiledCode>} compiledCodes The compiled code to be packed
+     * @param {Object} rendererOptions Options for the wrapper generation
      * @returns {string} The standalone AHK code
      */
-    static _StandalonePack(inputs, rendererOptions := {}) {
-        #IncludeAgain lib\RunTemplate.ahk
+    static _StandalonePack(compiledCodes, rendererOptions := {}) {
+        options := { base: rendererOptions, GetProp: this._GetProp }
+        output := ''
+
+        name := options.GetProp('name', 'MCode')
+
+        isStatic := options.GetProp('static', true)
+
+        ; TODO: Automatically choose compression when compression savings offset
+        ;       the additional decompression code
+        compress := options.GetProp('compress', true)
+
+        wrapper := options.GetProp('wrapper', 'function')
+        if wrapper != 'function' && wrapper != 'class'
+            throw Error('Unsupported wrapper type',, wrapper)
+
+        t := wrapper = 'class' ? '`t`t' : '`t'
+
+        if wrapper = 'function' { ; function
+            output .= name '() {`n'
+            if isStatic {
+                output .= '`tstatic lib := false`n'
+                output .= '`tif lib`n'
+                output .= '`t`treturn lib`n'
+            }
+        } else { ; class
+            output .= 'class ' name ' {`n'
+            output .= '`t' (isStatic ? 'static ' : '') '__New() {`n'
+        }
+        output .= t 'switch A_PtrSize {`n'
 
         /** @type {MCL.CompiledCode} */
-        input := inputs[1]
+        compiledCode := unset
+        for compiledCode in compiledCodes {
+            output .= t '`tcase ' compiledCode.bitness // 8 ': '
 
-        compressed := MCL.LZ.Compress(input.code)
-        base64 := MCL.Base64.Encode(compressed)
+            code := compiledCode.code
+            if compress
+                code := MCL.LZ.Compress(code)
+            base64 := MCL.Base64.Encode(code)
 
-        template := FileRead(A_LineFile "/../StandaloneTemplate_AsFunc.atp")
-        template := RunTemplate(template, {
-            name: (rendererOptions.HasProp('name') ? rendererOptions.name : 'MyC'),
-            base64: base64,
-            codeSize: input.code.size,
-            bitness: input.bitness,
-            compressedSize: compressed.Size,
-            imports: input.imports,
-            relocations: input.relocations,
-            exports: input.exports,
-            result: ""
-        })
+            imports := ""
+            for k, v in compiledCode.imports {
+                parts := StrSplit(v.name, '$')
+                imports .= ", ['" parts[1] "', '" parts[2] "'], " v.offset
+            }
+            imports := "Map(" SubStr(imports, 3) ")"
 
-        template := RegexReplace(template, "\r?\n\s*\r?\n", "`n")
+            exports := ""
+            for k, v in compiledCode.exports
+                exports .= ", " v.name ": " v.value
+            exports := "{" SubStr(exports, 3) "}"
 
-        return template
+            relocations := ""
+            for k, v in compiledCode.relocations
+                relocations .= ", " v
+            relocations := "[" SubStr(relocations, 3) "]"
+
+            base64Wrapped := '""'
+            while StrLen(base64) {
+                base64Wrapped .= '`n. "' SubStr(base64, 1, 120 - 8) '"'
+                base64 := SubStr(base64, (120 - 8) + 1)
+            }
+
+            output .= 'code := Buffer(' compiledCode.code.Size '), '
+            if compress
+                output .= 'b64Size := ' code.size ', '
+            if imports != 'Map()'
+                output .= 'imports := ' imports ', '
+            if exports != '{}'
+                output .= 'exports := ' exports ', '
+            output .= 'b64 := ' base64Wrapped '`n'
+
+            lastCompiledCode := compiledCode
+        }
+
+        output .= (
+            t '`tdefault: throw Error(A_ThisFunc " does not support " A_PtrSize * 8 " bit AHK")`n'
+            t '}`n'
+        )
+
+        if compress {
+            output .= (
+                t 'if !DllCall("Crypt32\CryptStringToBinary", "Str", b64, '
+                '"UInt", 0, "UInt", 1, "Ptr", buf := Buffer(b64Size), '
+                '"UInt*", buf.Size, "Ptr", 0, "Ptr", 0, "UInt")`n'
+                t '`tthrow Error("Failed to convert MCL b64 to binary")`n'
+                t 'if r := DllCall("ntdll\RtlDecompressBuffer", "UShort", 0x102, "Ptr", code, "UInt", '
+                'code.Size, "Ptr", buf, "UInt", buf.Size, "UInt*", &_ := 0, "UInt")`n'
+                t '`tthrow Error("Error calling RtlDecompressBuffer",, Format("0x{:08x}", r))`n'
+            )
+        } else {
+            output .= (
+                t 'if !DllCall("Crypt32\CryptStringToBinary", "Str", b64, '
+                '"UInt", 0, "UInt", 1, "Ptr", code, '
+                '"UInt*", code.Size, "Ptr", 0, "Ptr", 0, "UInt")`n'
+                t '`tthrow Error("Failed to convert MCL b64 to binary")`n'
+            )
+        }
+
+        if imports != 'Map()' {
+            output .= (
+                t 'for import, offset in imports {`n'
+                t '`tif !(hDll := DllCall("GetModuleHandle", "Str", import[1], "Ptr"))`n'
+                t '`t`tthrow OSError(,, "Failed to find DLL " import[1])`n'
+                t '`tif !(pFunction := DllCall("GetProcAddress", "Ptr", hDll, "AStr", import[2], "Ptr"))`n'
+                t '`t`tthrow Error(,, "Failed to find function " import[2] " from DLL " import[1])`n'
+                t '`tNumPut("Ptr", pFunction, code, offset)`n'
+                t '}`n'
+            )
+        }
+
+        if relocations != '[]' {
+            output .= (
+                t 'for offset in ' relocations '`n'
+                t '`tNumPut("Ptr", NumGet(code, offset, "Ptr") + code.Ptr, code, offset)`n'
+            )
+        }
+
+        output .= (
+            t 'if !DllCall("VirtualProtect", "Ptr", code, "Ptr", code.Size, "UInt", 0x40, "UInt*", &old := 0, "UInt")`n'
+            t '`tthrow Error("Failed to mark MCL memory as executable")`n'
+        )
+
+        exports := Map('raw', Map(), 'f', Map(), 'g', Map())
+        for name, data in lastCompiledCode.exports {
+            if data.types
+                exports[data.type][name] := data
+            else
+                exports['raw'][name] := data
+        }
+
+        defaultExport := false
+        if lastCompiledCode.exports.Has('__main')
+            defaultExport := '__main'
+        else if lastCompiledCode.exports.Has('Call')
+            defaultExport := false
+        else if lastCompiledCode.exports.Count == 1
+            for name in lastCompiledCode.exports
+                defaultExport := name
+
+        output .= (
+            t 'for k, v in exports.OwnProps()`n'
+            t '`texports.%k% := code.Ptr + v`n'
+        )
+
+        if wrapper = 'function' { ; function
+            output .= (
+                '`treturn lib := {`n'
+                '`t`texports: exports,`n'
+                '`t`tcode: code,`n'
+            )
+
+            if defaultExport {
+                if lastCompiledCode.exports[defaultExport].types
+                    output .= '`t`tCall: (this, p*) => this.' defaultExport '(p*),`n'
+                else
+                    output .= '`t`tPtr: exports.' defaultExport ',`n'
+            }
+
+            /** @type {MCL.Export} */
+            export := unset
+            for name, export in exports['raw']
+                output .= '`t`t' name ': exports.' name ',`n'
+            for name, export in exports['f'] {
+                output .= '`t`t' name ': (this'
+                for i, v in StrSplit(export.types, '$') {
+                    if !(i & 1)
+                        output .= ', ' v
+                }
+                output .= ') => DllCall(exports.' name
+                for i, v in StrSplit(export.types, "$")
+                    output .= ', ' (i & 1 ? '"' StrReplace(v, '_', ' ') '"' : v)
+                output .= ')`n'
+            }
+            output .= '`t}'
+            for name, export in exports['g'] {
+                output .= (
+                    '.DefineProp("' name '", {`n'
+                    '`t`tget: (this) => NumGet(exports.' name ', "' export.types '"),`n'
+                    '`t`tset: (this, value) => NumPut("' export.types '", value, exports.' name ')`n'
+                    '`t})'
+                )
+            }
+            output .= '`n'
+        } else { ; class
+            output .= (
+                '`t`tthis.exports := exports`n'
+                '`t`tthis.code := code`n'
+                '`t}`n'
+            )
+
+            if defaultExport {
+                if lastCompiledCode.exports[defaultExport].types
+                    output .= '`t' (isStatic ? 'static ' : '') 'Call(p*) => this.' defaultExport '(p*)`n'
+                else
+                    output .= '`t' (isStatic ? 'static ' : '') 'Ptr => this.exports.' defaultExport '`n'
+            }
+
+            /** @type {MCL.Export} */
+            export := unset
+            for name, export in exports['raw']
+                output .= '`t' (isStatic ? 'static ' : '') name ' => this.exports.' name '`n'
+            for name, export in exports['f'] {
+                output .= '`t' (isStatic ? 'static ' : '') name '('
+                for i, v in StrSplit(export.types, '$') {
+                    if !(i & 1)
+                        output .= ', ' v
+                }
+                output .= ') => DllCall(this.exports.' name
+                for i, v in StrSplit(export.types, "$")
+                    output .= ', ' (i & 1 ? '"' StrReplace(v, '_', ' ') '"' : v)
+                output .= ')`n'
+            }
+            for name, export in exports['g'] {
+                output .= (
+                    '`t' (isStatic ? 'static ' : '') name ' {`n'
+                    '`t`tget => NumGet(this.exports.' name ', "' export.types '")`n'
+                    '`t`tset => NumPut("' export.types '", value, this.exports.' name ')`n'
+                    '`t}`n'
+                )
+            }
+        }
+        output .= '}'
+        return output
     }
 
     static _StringFromLanguage(compiler, code, compilerOptions := {}, rendererOptions := {}) {
