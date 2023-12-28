@@ -669,7 +669,7 @@ class MCL {
         if IsSet(singleFunction) {
             export := MCL.Export()
             export.type := "f"
-            export.name := "__main" ;singleFunction.name
+            export.name := singleFunction.name
             export.types := ""
             export.value := singleFunction.value
             exports[export.name] := export
