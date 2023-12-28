@@ -678,6 +678,10 @@ class MCL {
         for symbolName, symbol in textSection.SymbolsByName {
             ; Export the __main function, when present
             if (symbolName = "__main") {
+                ; Avoid overwriting a macro-annotated __main export that may
+                ; contain type information with a raw export
+                if exports.Has('__main')
+                    continue
                 export := MCL.Export()
                 export.type := "f"
                 export.name := symbolName
