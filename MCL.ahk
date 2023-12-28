@@ -922,9 +922,9 @@ class MCL {
     static _StringFromLanguage(compiler, code, compilerOptions := {}, rendererOptions := {}) {
         compiledCodes := []
         if !compilerOptions.HasProp('bitness') || compilerOptions.bitness == 32
-            compiledCodes.Push(MCL._Compile(Compiler, Code, CompilerOptions, 32))
+            compiledCodes.Push(MCL._Compile(compiler, code, { base: compilerOptions, bitness: 32 }))
         if !compilerOptions.HasProp('bitness') || compilerOptions.bitness == 64
-            compiledCodes.Push(MCL._Compile(Compiler, Code, CompilerOptions, 64))
+            compiledCodes.Push(MCL._Compile(compiler, code, { base: compilerOptions, bitness: 64 }))
 
         return MCL.Pack(compiledCodes, rendererOptions)
     }
@@ -932,9 +932,9 @@ class MCL {
     static _StandaloneAHKFromLanguage(compiler, code, compilerOptions := {}, rendererOptions := {}) {
         compiledCodes := []
         if !compilerOptions.HasProp('bitness') || compilerOptions.bitness == 32
-            compiledCodes.Push(MCL._Compile(Compiler, Code, CompilerOptions, 32))
+            compiledCodes.Push(MCL._Compile(compiler, code, { base: compilerOptions, bitness: 32 }))
         if !compilerOptions.HasProp('bitness') || compilerOptions.bitness == 64
-            compiledCodes.Push(MCL._Compile(Compiler, Code, CompilerOptions, 64))
+            compiledCodes.Push(MCL._Compile(compiler, code, { base: compilerOptions, bitness: 64 }))
 
         return MCL._StandalonePack(compiledCodes, rendererOptions)
     }
