@@ -33,7 +33,7 @@ class MCL {
      * lib := MCL.FromCPP('int __main() { return 42; }')
      * MsgBox DllCall(lib, "CDecl Int")
      */
-    static FromCPP(code, compilerOptions := {}, rendererOptions := {}) {
+    static FromCPP(code, compilerOptions := {}) {
         if !compilerOptions.HasProp('flags')
             compilerOptions.flags := ''
         compilerOptions.flags .= ' -fno-exceptions -fno-rtti'
