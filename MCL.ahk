@@ -454,6 +454,12 @@ class MCL {
     }
 
     /**
+     * Helper function to get a property from an object, or a default value if
+     * the property is not present on the object.
+     */
+    static _GetProp := (o, name, default) => HasProp(o, name) ? o.%name% : default
+
+    /**
      * Generate a unique name for a temporary file in a given directory.
      * 
      * @param {String} baseDir - The base directory.
