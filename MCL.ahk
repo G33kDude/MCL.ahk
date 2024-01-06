@@ -974,6 +974,8 @@ class MCL {
                 output .= 'imports := ' imports ', '
             if exports != '{}'
                 output .= 'exports := ' exports ', '
+            if relocations != '[]'
+                output .= 'relocations := ' relocations ', '
             output .= 'b64 := ' base64Wrapped '`n'
 
             lastCompiledCode := compiledCode
@@ -1017,7 +1019,7 @@ class MCL {
 
         if relocations != '[]' {
             output .= (
-                t 'for offset in ' relocations '`n'
+                t 'for offset in relocations`n'
                 t '`tNumPut("Ptr", NumGet(code, offset, "Ptr") + code.Ptr, code, offset)`n'
             )
         }
