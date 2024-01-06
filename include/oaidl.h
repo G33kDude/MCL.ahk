@@ -14,7 +14,9 @@
 #define S_OK 0x00
 #define S_FALSE 0x01
 #define E_NOT_IMPLEMENTED 0x80004001
+#define E_NOTIMPL 0x80004001
 #define E_NO_INTERFACE 0x80004002
+#define E_NOINTERFACE 0x80004002
 #define E_POINTER 0x80004003
 #define E_UNEXPECTED 0x8000FFFF
 
@@ -28,6 +30,7 @@
 #define VT_EMPTY 0
 #define VT_NULL 1
 #define VT_I4 3
+#define VT_R4 4
 #define VT_R8 5
 #define VT_BSTR 8
 #define VT_DISPATCH 9
