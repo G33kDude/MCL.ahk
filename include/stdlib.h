@@ -32,6 +32,7 @@ static void free(void* Memory) {
 MCL_IMPORT(void*, msvcrt, memcpy, (void*, const void*, size_t));
 MCL_IMPORT(void*, msvcrt, memset, (void*, int, size_t));
 MCL_IMPORT(int, msvcrt, memcmp, (const void*, const void*, size_t));
+MCL_IMPORT(void*, msvcrt, memmove, (void*, const void*, size_t));
 
 #ifdef __cplusplus
 
