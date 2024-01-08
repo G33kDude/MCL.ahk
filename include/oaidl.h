@@ -25,6 +25,7 @@
 #define DISP_E_UNKNOWNNAME 0x80020006
 #define DISP_E_BADVARTYPE 0x80020008
 #define DISP_E_BADPARAMCOUNT 0x8002000E
+#define DISP_E_EXCEPTION 0x80020009
 
 // https://github.com/tpn/winsdk-10/blob/master/Include/10.0.16299.0/shared/wtypes.h
 #define VT_EMPTY 0
