@@ -572,7 +572,6 @@ class MCL {
                 "--function-sections "
                 "--data-sections "
                 "-c "
-                "-Os "
             )
 
             if out.ExitCode
