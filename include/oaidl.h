@@ -35,6 +35,7 @@
 #define VT_R8 5
 #define VT_BSTR 8
 #define VT_DISPATCH 9
+#define VT_ERROR 10
 #define VT_BOOL 11
 #define VT_VARIANT 12
 #define VT_UNKNOWN 13
