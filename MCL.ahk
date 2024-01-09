@@ -989,6 +989,8 @@ class MCL {
             t '}`n'
         )
 
+        output .= t '; MCL standalone loader https://github.com/G33kDude/MCL.ahk`n'
+
         if compress {
             output .= (
                 t 'if !DllCall("Crypt32\CryptStringToBinary", "Str", b64, '
