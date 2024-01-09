@@ -572,6 +572,10 @@ class MCL {
                 "--function-sections "
                 "--data-sections "
                 "-c "
+
+                ; The omit-frame-pointer optimization, enabled by O1-O3, breaks
+                ; imported C runtime functions under 32 bit.
+                "-fno-omit-frame-pointer "
             )
 
             if out.ExitCode
